@@ -18,6 +18,10 @@
 | DEC-007 | Prevención de Deadlock mediante adquisición Todo-o-Nada atómica | Prevenir bloqueos mutuos garantizando que el sistema no sufra interbloqueos en modo seguro. | 1. Ordenamiento lineal global estricto de recursos (jerarquía de Dijkstra).<br>2. Detección continua y expulsión automática preventiva.<br>3. Solicitud atómica Todo-o-Nada con Rollback inmediato. | Adquisición atómica Todo-o-Nada (`tryAcquire` de todos los recursos requeridos bajo un lock de arbitraje; rollback si alguno falla). | Niega la condición de Coffman de **Retención y Espera (Hold and Wait)**: un proceso jamás retiene recursos mientras espera indefinidamente por otros. El interbloqueo es matemáticamente imposible. |
 | DEC-008 | Concesión AutoCloseable (Patrón RAII) | Evitar fugas de recursos (resource leaks) si un hilo de pedido falla o es interrumpido abruptamente. | 1. Liberación manual dependiente de cada punto de retorno en el código.<br>2. Hilo recolector de basura de recursos.<br>3. Objeto `Concesion implements AutoCloseable` en bloque `finally`. | `Concesion` liberando en orden inverso (LIFO) de forma atómica e idempotente. | Principio RAII (Resource Acquisition Is Initialization). Garantiza que ante `InterruptedException` (resolución de deadlock) o errores de runtime, el 100% de los permisos se reintegren a los semáforos sin orfandad. |
 | DEC-009 | Despachador reactivo basado en Monitor y planificador Work-Conserving | Despachar pedidos en espera sin sobrecarga de consumo de CPU por sondeo constante (busy waiting). | 1. Bucle infinito con `Thread.sleep` fijo (polling activo ineficiente).<br>2. Hilos que compiten directamente sin despachador central.<br>3. Despachador centralizado con monitor `ReentrantLock` + `Condition` y algoritmo conservador del trabajo. | Monitor con `Condition.await(timeout)` que despierta ante eventos puntuales, saltando pedidos no factibles para atender los que sí tienen recursos libres. | Patrón Monitor de Hoare/Brinch Hansen. El enfoque *work-conserving* garantiza que ningún recurso quede ocioso si existe al menos un proceso en la cola que pueda utilizarlo, maximizando el throughput global. |
+| DEC-010 | Algoritmo de Envejecimiento (Aging) para prevención de Inanición | Evitar que los pedidos de Nivel 4 y 5 queden postergados indefinidamente por la llegada constante de pedidos Nivel 1 y 2. | 1. Cuotas fijas por nivel (round-robin por nivel).<br>2. Envejecimiento dinámico: $NivelEfectivo = \max(1, Nivel - \lfloor espera/T_{aging} \rfloor)$. | Prioridad dinámica decreciente numéricamente con el tiempo de espera acumulado. | Concepto clásico de Aging de Sistemas Operativos. Garantiza que la prioridad de todo proceso bloqueado en cola aumente monótonamente con el tiempo, asegurando la propiedad de equidad (*fairness*). |
+| DEC-011 | Planificación SJF (Shortest Job First / SPT) por unidades de pedido | Minimizar el tiempo medio de espera de la cola global de pedidos. | 1. Estimar ráfaga por histórico.<br>2. Menor cantidad de unidades totales primero ($duración = unidades \times 30s$). | Menor cantidad de unidades de productos primero, con desempate por nivel de servicio y llegada FIFO. | El teorema de planificación SPT (Shortest Processing Time / SJF) demuestra que ordenar por menor tiempo de servicio minimiza el tiempo promedio de espera global ($W_{prom}$). |
+| DEC-012 | Planificación EDF (Earliest Deadline First) para optimización de SLA | Maximizar el porcentaje global de cumplimiento de acuerdos de nivel de servicio (SLA). | 1. Heurísticas estáticas de prioridad.<br>2. EDF dinámico según el instante absoluto de vencimiento de SLA ($Creación + SLA_{nivel}$). | El pedido cuya fecha límite vence primero es atendido primero. | Teorema de optimalidad de Liu y Layland (1973): EDF es óptimo para programación de tareas con fechas límite dinámicas, minimizando la fracción de pedidos que violan su SLA. |
+| DEC-013 | Acumuladores `LongAdder` para métricas y telemetría de alto rendimiento | Registrar miles de transacciones y cálculos de SLA concurrentemente sin cuellos de botella. | 1. `synchronized` global para métricas.<br>2. `AtomicLong` con bucles CAS.<br>3. `LongAdder` con contadores divididos en celdas por hilo (*striped counters*). | `LongAdder` para contadores y sumadores + `AtomicLong` para valores extremos (máximos). | Minimiza la contención de memoria en arquitecturas SMP multicore; elimina el falso intercambio de líneas de caché (*false sharing*) y la degradación por reintentos CAS bajo alta contención. |
 
 ---
 
@@ -122,3 +126,44 @@
   3. *Monitor de sincronización con `ReentrantLock` y `Condition`*: El despachador duerme en `Condition.await()` y es despertado instantáneamente ante eventos reales (llegada de pedido, liberación de recurso por un trabajador, cambio de política).
 - **Elección:** Monitor reactivo con timeout auxiliar de 250 ms (para re-evaluación de aging).
 - **Fundamento Teórico:** Modelo de Monitores de Hoare/Brinch Hansen. El algoritmo es *work-conserving*: si el primer pedido de la cola no puede ejecutarse por falta de un recurso específico, evalúa a los siguientes candidatos factibles, impidiendo que recursos libres queden desaprovechados.
+
+---
+
+### DEC-010: Algoritmo de Envejecimiento (Aging) para prevención de Inanición
+- **Problema:** En prioridad estricta, si entran continuamente pedidos de Nivel 1 o 2, los pedidos de Nivel 5 sufren inanición (starvation) indefinida.
+- **Alternativas:**
+  1. *Round-robin por nivel*: No respeta los acuerdos comerciales de prioridad para clientes que pagan más.
+  2. *Envejecimiento proporcional discreto*: Cada intervalo de tiempo $T_{aging}$ que un pedido espera sin ser atendido, su prioridad efectiva se incrementa en 1 unidad numérica hacia Nivel 1.
+- **Elección:** $NivelEfectivo = \max(1, NivelOriginal - \lfloor esperaSegundos / T_{aging} \rfloor)$.
+- **Fundamento Teórico:** Principio de envejecimiento (Silberschatz). Al aumentar monótonamente la prioridad efectiva con el tiempo de espera, se garantiza que cualquier proceso eventualmente alcance la prioridad máxima y sea despachado, erradicando la inanición.
+
+---
+
+### DEC-011: Planificación SJF (Shortest Job First / SPT)
+- **Problema:** Maximizar la cantidad de pedidos despachados por unidad de tiempo y minimizar el tiempo medio de permanencia en la cola.
+- **Alternativas:**
+  1. *SJF con estimación histórica*: Complejo e innecesario dado que conocemos exactamente la cantidad de artículos.
+  2. *SJF determinista por total de unidades*: Dado que el trabajo es estrictamente proporcional a las unidades ($30\text{ s sim/unidad}$), el pedido con menor número total de unidades tiene la ráfaga más corta.
+- **Elección:** Ordenar por `totalUnidades` ascendente; desempate por nivel de servicio y FIFO.
+- **Fundamento Teórico:** Teorema de Smith / Conway: La regla SPT (Shortest Processing Time) minimiza matemáticamente la suma ponderada y no ponderada de tiempos de espera en sistemas monoprocesador/estación.
+
+---
+
+### DEC-012: Planificación por Fecha Límite Más Cercana (EDF)
+- **Problema:** Reducir la tasa de incumplimiento de acuerdos SLA en pedidos con metas temporales fijas.
+- **Alternativas:**
+  1. *Prioridad fija por SLA*: No toma en cuenta cuándo llegó el pedido.
+  2. *EDF Dinámico*: $Deadline = InstanteCreacion + SLA_{nivel}$. El pedido cuya fecha límite vence antes va de primero.
+- **Elección:** `PoliticaEDF` calculando la fecha límite absoluta contra el reloj simulado.
+- **Fundamento Teórico:** Teorema de Liu y Layland (1973). EDF es el algoritmo óptimo en sistemas de tiempo real para cumplir restricciones de plazo (deadlines).
+
+---
+
+### DEC-013: Acumuladores `LongAdder` para métricas de alto rendimiento
+- **Problema:** Múltiples hilos concurrentes terminando pedidos y actualizando métricas globales simultáneamente sin generar contención ni degradar el throughput.
+- **Alternativas:**
+  1. *Locks de exclusión mutua*: Serializan todas las escrituras estadísticas.
+  2. *`AtomicLong`*: Provoca colisiones continuas en el bucle CAS bajo alta concurrencia.
+  3. *`LongAdder`*: Distribuye las operaciones de suma en celdas internas asociadas a los hilos activos.
+- **Elección:** `LongAdder` para contadores globales y por nivel; `AtomicLong` solo para el cálculo de máximos (`accumulateAndGet`).
+- **Fundamento Teórico:** Mitigación de contención de memoria (*cache-line bouncing* y *false sharing*) en arquitecturas multinúcleo con memoria compartida (SMP).

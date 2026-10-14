@@ -2,11 +2,13 @@ package gt.usac.redxela.planificacion;
 
 import gt.usac.redxela.config.ConfiguracionSimulacion;
 import gt.usac.redxela.config.SimClock;
+import gt.usac.redxela.estadisticas.Estadisticas;
 import gt.usac.redxela.modelo.EstadoPedido;
 import gt.usac.redxela.modelo.Pedido;
 import gt.usac.redxela.proceso.TrabajadorPedido;
 import gt.usac.redxela.recursos.Concesion;
 import gt.usac.redxela.recursos.GestorRecursos;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -35,6 +37,7 @@ public class Despachador implements Runnable {
     private final ListaEspera listaEspera;
     private final GestorRecursos gestorRecursos;
     private final SimClock simClock;
+    private final Estadisticas estadisticas;
 
     private final ReentrantLock monitorLock = new ReentrantLock();
     private final Condition eventoPendiente = monitorLock.newCondition();
@@ -48,11 +51,25 @@ public class Despachador implements Runnable {
 
     private Thread hiloDespachador;
 
+    @Autowired
     public Despachador(ListaEspera listaEspera, GestorRecursos gestorRecursos,
-                       SimClock simClock, PoliticaPrioridadEstricta politicaInicial) {
+                       SimClock simClock, PoliticaPrioridadEstricta politicaInicial,
+                       Estadisticas estadisticas) {
         this.listaEspera = listaEspera;
         this.gestorRecursos = gestorRecursos;
         this.simClock = simClock;
+        this.politicaActiva = politicaInicial;
+        this.estadisticas = estadisticas;
+    }
+
+    /**
+     * Constructor auxiliar para pruebas unitarias sin inyección completa.
+     */
+    public Despachador(ListaEspera listaEspera, GestorRecursos gestorRecursos,
+                       SimClock simClock, PoliticaAtencion politicaInicial) {
+        this(listaEspera, gestorRecursos, simClock,
+                politicaInicial instanceof PoliticaPrioridadEstricta p ? p : new PoliticaPrioridadEstricta(),
+                new Estadisticas());
         this.politicaActiva = politicaInicial;
     }
 
@@ -106,6 +123,12 @@ public class Despachador implements Runnable {
 
                 if (!activo) break;
 
+                // Registro periódico de telemetría de cola
+                long ahoraSim = simClock.ahoraSimuladoSegundos();
+                if (estadisticas != null) {
+                    estadisticas.registrarMuestraCola(ahoraSim, listaEspera.size(), pedidosEnProceso.size());
+                }
+
                 evaluarCola();
 
             } catch (InterruptedException e) {
@@ -152,14 +175,22 @@ public class Despachador implements Runnable {
             pedidosEnProceso.remove(pedido.getId());
             hilosTrabajadores.remove(pedido.getId());
 
+            long finSimulado = simClock.ahoraSimuladoSegundos();
+
             if (pedido.getEstado() == EstadoPedido.COMPLETADO) {
                 pedidosCompletados.addFirst(pedido);
                 while (pedidosCompletados.size() > ConfiguracionSimulacion.MAX_PEDIDOS_COMPLETADOS_HISTORICO) {
                     pedidosCompletados.pollLast();
                 }
+                if (estadisticas != null) {
+                    estadisticas.registrarPedidoCompletado(pedido, finSimulado);
+                }
             } else if (pedido.getEstado() == EstadoPedido.EN_ESPERA_RECURSOS) {
                 // Si fue interrumpido o reencolado
                 listaEspera.agregar(pedido);
+                if (estadisticas != null) {
+                    estadisticas.registrarReencolado();
+                }
             }
 
             // Despierta al monitor para evaluar a los siguientes pedidos en espera
@@ -196,5 +227,9 @@ public class Despachador implements Runnable {
 
     public Thread getHiloTrabajador(String pedidoId) {
         return hilosTrabajadores.get(pedidoId);
+    }
+
+    public Estadisticas getEstadisticas() {
+        return estadisticas;
     }
 }
