@@ -3,12 +3,14 @@ package gt.usac.redxela.planificacion;
 import gt.usac.redxela.config.ConfiguracionSimulacion;
 import gt.usac.redxela.config.SimClock;
 import gt.usac.redxela.estadisticas.Estadisticas;
+import gt.usac.redxela.inventario.Inventario;
 import gt.usac.redxela.modelo.EstadoPedido;
 import gt.usac.redxela.modelo.Pedido;
 import gt.usac.redxela.proceso.TrabajadorPedido;
 import gt.usac.redxela.recursos.Concesion;
 import gt.usac.redxela.recursos.GestorRecursos;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -23,13 +25,13 @@ import java.util.concurrent.locks.ReentrantLock;
  * 
  * Opera como un monitor de sincronización utilizando ReentrantLock y Condition:
  * se duerme de forma eficiente cuando no hay trabajo factible y despierta ante
- * eventos (llegada de nuevo pedido, liberación de recursos, cambios de política
- * o ticks temporales para envejecimiento).
+ * eventos (llegada de nuevo pedido, liberación de recursos, llegada de existencias a almacén,
+ * cambios de política o ticks temporales para envejecimiento).
  * 
- * Es un planificador CONSERVADOR DEL TRABAJO (Work-Conserving): si el proceso de
- * mayor prioridad no puede iniciar por falta de algún recurso específico, evalúa
- * a los siguientes candidatos factibles para maximizar el aprovechamiento de los
- * recursos del centro de distribución sin desperdiciar capacidad ociosa.
+ * Es un planificador CONSERVADOR DEL TRABAJO (Work-Conserving):
+ * 1. Si no hay stock para el pedido prioritario -> pasa a EN_ESPERA_STOCK y evalúa al siguiente.
+ * 2. Si no hay recursos disponibles -> revierte reserva de stock, pasa a EN_ESPERA_RECURSOS y evalúa al siguiente.
+ * 3. Si ambos están disponibles -> despacha el pedido.
  */
 @Component
 public class Despachador implements Runnable {
@@ -38,6 +40,10 @@ public class Despachador implements Runnable {
     private final GestorRecursos gestorRecursos;
     private final SimClock simClock;
     private final Estadisticas estadisticas;
+
+    @Autowired(required = false)
+    @Lazy
+    private Inventario inventario;
 
     private final ReentrantLock monitorLock = new ReentrantLock();
     private final Condition eventoPendiente = monitorLock.newCondition();
@@ -73,6 +79,10 @@ public class Despachador implements Runnable {
         this.politicaActiva = politicaInicial;
     }
 
+    public void setInventario(Inventario inventario) {
+        this.inventario = inventario;
+    }
+
     /**
      * Inicia el hilo despachador de plataforma.
      */
@@ -97,8 +107,7 @@ public class Despachador implements Runnable {
     }
 
     /**
-     * Notifica al monitor que ha ocurrido un evento relevante (nuevo pedido,
-     * recursos liberados, o cambio de política) para re-evaluar la cola.
+     * Notifica al monitor que ha ocurrido un evento relevante para re-evaluar la cola.
      */
     public void despertar() {
         monitorLock.lock();
@@ -141,7 +150,7 @@ public class Despachador implements Runnable {
     }
 
     /**
-     * Evalúa a los candidatos en espera según la política de planificación activa.
+     * Evalúa a los candidatos en espera según la política de planificación activa (R5, R12).
      */
     public void evaluarCola() {
         long ahoraSim = simClock.ahoraSimuladoSegundos();
@@ -150,6 +159,17 @@ public class Despachador implements Runnable {
         for (Pedido candidato : candidatos) {
             if (!activo) break;
 
+            // 1. Verificación y reserva atómica de stock en almacén (si inventario está presente)
+            boolean stockReservado = false;
+            if (inventario != null) {
+                stockReservado = inventario.intentarReservarStock(candidato);
+                if (!stockReservado) {
+                    candidato.marcarEnEsperaStock();
+                    continue; // Pasa al siguiente candidato factible (work-conserving)
+                }
+            }
+
+            // 2. Verificación de recursos compartidos (empaque, montacargas, etc.)
             if (gestorRecursos.isPrevencionDeadlock()) {
                 // MODO CON PREVENCIÓN: Intento todo-o-nada atómico
                 Optional<Concesion> concesionOpt = gestorRecursos.intentarAdquirirTodoONada(candidato, ahoraSim);
@@ -157,11 +177,14 @@ public class Despachador implements Runnable {
                     listaEspera.remover(candidato);
                     lanzarTrabajador(candidato, concesionOpt.get());
                 } else {
-                    // No hay recursos suficientes en este momento
+                    // Si fallaron los recursos, se deshace la reserva de stock para no acaparar existencias
+                    if (stockReservado && inventario != null) {
+                        inventario.cancelarReserva(candidato);
+                    }
                     candidato.marcarEnEsperaRecursos();
                 }
             } else {
-                // MODO SIN PREVENCIÓN: El trabajador se lanza y adquiere uno a uno
+                // MODO SIN PREVENCIÓN: El trabajador se lanza y adquiere incrementalmente
                 listaEspera.remover(candidato);
                 lanzarTrabajador(candidato, null);
             }
@@ -182,14 +205,27 @@ public class Despachador implements Runnable {
                 while (pedidosCompletados.size() > ConfiguracionSimulacion.MAX_PEDIDOS_COMPLETADOS_HISTORICO) {
                     pedidosCompletados.pollLast();
                 }
+
+                // Consumir definitivamente el stock y liberar celdas del almacén
+                if (inventario != null) {
+                    inventario.consumirReservaYStock(pedido);
+                }
+
                 if (estadisticas != null) {
                     estadisticas.registrarPedidoCompletado(pedido, finSimulado);
                 }
             } else if (pedido.getEstado() == EstadoPedido.EN_ESPERA_RECURSOS) {
-                // Si fue interrumpido o reencolado
+                // Si fue reencolado o interrumpido, liberamos la reserva de stock
+                if (inventario != null) {
+                    inventario.cancelarReserva(pedido);
+                }
                 listaEspera.agregar(pedido);
                 if (estadisticas != null) {
                     estadisticas.registrarReencolado();
+                }
+            } else if (pedido.getEstado() == EstadoPedido.CANCELADO) {
+                if (inventario != null) {
+                    inventario.cancelarReserva(pedido);
                 }
             }
 

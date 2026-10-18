@@ -22,148 +22,58 @@
 | DEC-011 | Planificación SJF (Shortest Job First / SPT) por unidades de pedido | Minimizar el tiempo medio de espera de la cola global de pedidos. | 1. Estimar ráfaga por histórico.<br>2. Menor cantidad de unidades totales primero ($duración = unidades \times 30s$). | Menor cantidad de unidades de productos primero, con desempate por nivel de servicio y llegada FIFO. | El teorema de planificación SPT (Shortest Processing Time / SJF) demuestra que ordenar por menor tiempo de servicio minimiza el tiempo promedio de espera global ($W_{prom}$). |
 | DEC-012 | Planificación EDF (Earliest Deadline First) para optimización de SLA | Maximizar el porcentaje global de cumplimiento de acuerdos de nivel de servicio (SLA). | 1. Heurísticas estáticas de prioridad.<br>2. EDF dinámico según el instante absoluto de vencimiento de SLA ($Creación + SLA_{nivel}$). | El pedido cuya fecha límite vence primero es atendido primero. | Teorema de optimalidad de Liu y Layland (1973): EDF es óptimo para programación de tareas con fechas límite dinámicas, minimizando la fracción de pedidos que violan su SLA. |
 | DEC-013 | Acumuladores `LongAdder` para métricas y telemetría de alto rendimiento | Registrar miles de transacciones y cálculos de SLA concurrentemente sin cuellos de botella. | 1. `synchronized` global para métricas.<br>2. `AtomicLong` con bucles CAS.<br>3. `LongAdder` con contadores divididos en celdas por hilo (*striped counters*). | `LongAdder` para contadores y sumadores + `AtomicLong` para valores extremos (máximos). | Minimiza la contención de memoria en arquitecturas SMP multicore; elimina el falso intercambio de líneas de caché (*false sharing*) y la degradación por reintentos CAS bajo alta contención. |
+| DEC-014 | Paso de Mensajes Inmutables con Cola Acotada (Productor-Consumidor IPC) | Comunicar Recepción e Inventario sin compartir estructuras internas mutables y tolerar velocidades desiguales (R10). | 1. Estructura de inventario compartida con locks globales.<br>2. Cola infinita en memoria (riesgo de OutOfMemory).<br>3. `ArrayBlockingQueue<MensajeRecepcion>` acotada con contrapresión (`put()` bloqueante). | `ArrayBlockingQueue(20)` acotada transmitiendo records `MensajeRecepcion` inmutables. | Modelo Productor-Consumidor clásico con búfer acotado (Bounded Buffer) de Dijkstra. Aplica contrapresión (backpressure) natural: si Recepción es más rápida, se bloquea en `put()`, los camiones esperan en patio y no hay pérdida de datos ni bloqueo indefinido. |
+| DEC-015 | Asignación Indexada No Contigua y Mapa de Bits en Almacén | Administrar el espacio físico del almacén (240 celdas) evitando la fragmentación externa (R13). | 1. Asignación contigua estricta en el mismo pasillo (riesgo severo de fragmentación externa).<br>2. Asignación encadenada con punteros en cada celda.<br>3. Asignación Indexada con tabla de bloques y `BitSet` de celdas libres. | Asignación indexada no contigua: cada lote mantiene su tabla de bloques `(Ubicacion, unidades)` sobre un mapa de bits (`BitSet`). | Mapeo idéntico a la asignación indexada de inodos en UNIX y marcos de página en memoria virtual. Elimina la fragmentación externa al 100%, admitiendo lotes dispersos en pasillos no contiguos. |
+| DEC-016 | Reserva Atómica de Stock de Dos Fases (Prevención de Sobreventa) | Evitar condiciones de carrera donde dos pedidos compitan por las mismas existencias físicas en almacén. | 1. Descontar stock directamente al completar el pedido.<br>2. Verificación sin lock previo.<br>3. Protocolo de reserva atómica de dos fases: $Disponible = Existencias - Reservas$. | Reserva atómica previa bajo `lockStock`: si no hay suficiente para todas las líneas, aborta y hace rollback; si hay, reserva y luego consume al completar. | Principio de transaccionalidad atómica y exclusión mutua de recursos no renovables. Elimina condiciones de carrera de lectura-modificación-escritura (Check-then-Act), garantizando cero sobreventa. |
+| DEC-017 | Despertar Reactivo de Pedidos Condicionados por E/S (R12) | Activar pedidos en `EN_ESPERA_STOCK` tan pronto ingrese mercancía al almacén sin sondeo activo. | 1. Hilos de pedido en busy-waiting consultando stock.<br>2. Temporizador periódico de reintento de stock.<br>3. Señal reactiva: el hilo consumidor de Inventario notifica al monitor del Despachador. | Inventario llama a `despachador.despertar()` inmediatamente después de incorporar un lote físico al almacén. | Paradigma de E/S orientada a interrupciones / señales de finalización de E/S. Transición directa de estado `EN_ESPERA_STOCK` (I/O Wait) a `EN_ESPERA_RECURSOS` (Ready Queue). |
 
 ---
 
 ## Registro Detallado de Decisiones
 
-### DEC-001: Stack tecnológico y concurrencia pura en Java
-- **Problema:** El proyecto requiere demostrar conceptos profundos de concurrencia de Sistemas Operativos (exclusión mutua, semáforos contadores, productor-consumidor acotado, detección y prevención de deadlock, algoritmos de scheduling).
-- **Alternativas:**
-  1. *Node.js*: Concurrencia basada en bucle de eventos monohilo; no utiliza hilos del SO para computación paralela de pedidos ni primitivas de sincronización atómicas reales.
-  2. *C / C++ (Pthreads)*: Excelente para SO, pero la integración con una interfaz gráfica web moderna y reactiva en el tiempo asignado incrementa el riesgo de desarrollo.
-  3. *Java 21 con `java.util.concurrent`*: Hilos de plataforma reales mapeados 1:1 a hilos del sistema operativo (POSIX threads en Linux), soporte exhaustivo de `Semaphore`, `ReentrantLock`, `Condition`, `ArrayBlockingQueue`. Spring Boot se limita a servir HTTP/SSE y DI; el motor concurrente es autónomo.
-- **Elección:** Java 21 con Spring Boot 3 para backend, React + TypeScript + Vite para frontend.
-- **Fundamento Teórico:** Los hilos de plataforma proporcionan concurrencia real preemptiva gobernada por el planificador del kernel, permitiendo simular contención de recursos, bloqueos mutuos reales y cambios de contexto genuinos.
+### DEC-001 a DEC-013 (Fases 0 a 3)
+*(Ver secciones anteriores para el detalle formal de las decisiones DEC-001 a DEC-013)*.
 
 ---
 
-### DEC-002: Server-Sent Events (SSE) para visualización en tiempo real
-- **Problema:** La interfaz debe reflejar estados de recursos, pedidos en cola, progreso de procesamiento y alertas de deadlock sin recargar la página.
+### DEC-014: Paso de Mensajes Inmutables con Cola Acotada (R10)
+- **Problema:** El requisito R10 exige comunicar Recepción e Inventario sin tocar estructuras internas ajenas, operando limpiamente incluso si Recepción es significativamente más rápida que Inventario.
 - **Alternativas:**
-  1. *Polling HTTP*: Fácil de implementar, pero genera sobrecarga innecesaria de encabezados HTTP repetidos.
-  2. *WebSockets*: Protocolo bidireccional completo, pero requiere manejo de desconexión/reconexión manual y mayor complejidad en el backend para un flujo predominantemente de solo lectura (telemetría).
-  3. *Server-Sent Events (SSE)*: Canal unidireccional persistente sobre HTTP con reconexión nativa del navegador.
-- **Elección:** SSE enviando un `EstadoSistema` inmutable cada 500 ms con fallback a `GET /api/estado`.
-- **Fundamento Teórico:** Modelo cliente-servidor con transmisión de flujo de datos push; desacopla el ciclo de ejecución del despachador del ciclo de renderizado de la UI.
+  1. *Inventario compartido con cerrojo global*: Recepción modificaría directamente el mapa del almacén, rompiendo la separación de áreas y aumentando la contención de sincronización.
+  2. *Cola ilimitada (`LinkedBlockingQueue` sin tope)*: Si los camiones llegan a un ritmo superior al de almacenamiento, la cola acumularía mensajes indefinidamente consumiendo memoria hasta provocar `OutOfMemoryError`.
+  3. *Búfer acotado con paso de mensajes inmutables*: `ArrayBlockingQueue(20)` transfiriendo records `MensajeRecepcion` inmutables.
+- **Elección:** `ArrayBlockingQueue<MensajeRecepcion>` con capacidad 20.
+- **Fundamento Teórico:** Problema del Búfer Acotado (Bounded-Buffer / Productor-Consumidor) formulado por Dijkstra. La llamada `put()` suspende al productor cuando el búfer alcanza su capacidad máxima, ejerciendo contrapresión física hacia el patio de camiones. Como el consumidor siempre drena mensajes y no retiene recursos requeridos por el productor, se demuestra la ausencia de inanición y de bloqueo permanente.
 
 ---
 
-### DEC-003: Reloj de Simulación Acelerado (`SimClock`)
-- **Problema:** Los pedidos manejan SLAs simulados de 0 a 120 minutos. Una prueba en tiempo real tardaría horas, pero una simulación puramente matemática sin hilos reales perdería el valor pedagógico del SO.
+### DEC-015: Asignación Indexada No Contigua y Mapa de Bits en Almacén (R13)
+- **Problema:** Un lote de $N$ unidades puede requerir múltiples celdas físicas en el almacén ($6\times 4\times 10 = 240$ ubicaciones). Si se exigiera contigüidad física en el mismo pasillo o nivel, la liberación de lotes antiguos dejaría "huecos" insuficientes para lotes grandes aun teniendo celdas libres en total (Fragmentación Externa).
 - **Alternativas:**
-  1. *Simulación discreta orientada a eventos (DES)*: No utiliza hilos reales en espera; calcula saltos temporales matemáticos. No demuestra concurrencia real de hilos del SO.
-  2. *Tiempos fijos arbitrarios pequeños*: Rompe la correspondencia con las metas de SLA del enunciado (10, 30, 60, 120 min).
-  3. *Reloj proporcional diferencial continuo*: Define un factor de aceleración $F$ (por defecto $60\times$: 1 s real = 1 min sim). Cuando un hilo duerme, duerme $\Delta t_{sim} / F$ ms reales. Al cambiar $F$ o pausar, se preserva $T_{base\_sim}$.
-- **Elección:** Reloj proporcional diferencial continuo en `SimClock` protegido por `ReentrantLock`.
-- **Fundamento Teórico:** Sincronización temporal lineal. Garantiza monotonicidad $T_{sim}(t_2) \ge T_{sim}(t_1)$ para $t_2 \ge t_1$, evitando viajes al pasado al variar la velocidad de simulación.
+  1. *Asignación contigua estricta*: Sufre de fragmentación externa y requiere algoritmos de compactación costosos.
+  2. *Asignación encadenada*: Cada celda guarda un puntero a la siguiente. Dificulta el acceso directo y la auditoría visual de la UI.
+  3. *Asignación Indexada*: El lote almacena una tabla indexada de pares `(Ubicacion, unidades)`. La búsqueda de celdas libres se hace sobre un `BitSet` de 240 bits mediante Primer Ajuste (First-Fit).
+- **Elección:** Asignación indexada no contigua con `BitSet` y `ReentrantReadWriteLock`.
+- **Fundamento Teórico:** Correspondencia 1:1 con la asignación indexada de bloques en sistemas de archivos (inodos en UNIX / ext4) y la paginación en memoria virtual. Permite alojar un lote en celdas separadas sin requerir contigüidad, erradicando al 100% la fragmentación externa a cambio de una pequeña fragmentación interna acotada únicamente a la última celda del lote.
 
 ---
 
-### DEC-004: Agregación de recursos en pedidos multilínea
-- **Problema:** Si un pedido contiene un producto Frágil (ENCARGADO, CONTROL_CALIDAD, EMPAQUE) y uno Pesado (ENCARGADO, MONTACARGAS, CARGA), ¿cuántos encargados requiere?
+### DEC-016: Reserva Atómica de Stock de Dos Fases
+- **Problema:** Si dos pedidos concurrentes requieren existencias del mismo producto y ambos comprueban el stock libre antes de descontarlo, puede producirse una condición de carrera (Check-then-Act) que provoque la sobreventa de artículos inexistentes.
 - **Alternativas:**
-  1. *Suma acumulativa de unidades*: El pedido exigiría 2 encargados simultáneos. Si hay muchos pedidos multilínea, los 10 encargados se agotarían casi al instante y aumentaría la posibilidad de inanición no deseada.
-  2. *Restringir a 1 solo tipo de mercancía por pedido*: Limita el realismo de los carritos de compra de los clientes.
-  3. *Unión de conjuntos con 1 unidad por tipo de recurso*: El pedido requiere la unión $\{ENCARGADO, CONTROL\_CALIDAD, EMPAQUE, MONTACARGAS, CARGA\}$, solicitando exactamente 1 unidad de cada tipo.
-- **Elección:** Unión de tipos de recursos (1 unidad de cada recurso participante).
-- **Fundamento Teórico:** Representación de necesidades de recursos como un vector booleano de demanda unitaria en la matriz de necesidades del algoritmo de detección/asignación de recursos, modelando un flujo coordinado por estación.
+  1. *Descontar directamente al momento de despachar*: Si el pedido falla posteriormente por falta de recursos de empaque o montacargas, el inventario quedaría desfasado.
+  2. *Reservas sin lock global*: Condiciones de carrera entre lecturas y escrituras simultáneas.
+  3. *Protocolo atómico de reserva en dos fases*: Un pedido consulta y aparta stock ($Reservas += Cantidad$) antes de lanzar al trabajador; al terminar el pedido, se consolida consumiendo el stock físico; si el pedido se cancela o reencola, la reserva se revierte de inmediato.
+- **Elección:** Protocolo de reservas atómicas bajo `lockStock` (`ReentrantLock(true)`).
+- **Fundamento Teórico:** Protocolo de Reserva / Compromiso en dos fases (Two-Phase Commit conceptual) sobre recursos compartidos no renovables, garantizando la invariante matemática:
+$$\text{Stock Libre} = \text{Existencias Físicas} - \text{Stock Reservado} \ge 0$$
 
 ---
 
-### DEC-005: Modelado de estados del pedido análogo a estados de proceso
-- **Problema:** El enunciado requiere pedidos en espera por falta de stock y por falta de recursos, pedidos en proceso, pedidos bloqueados en deadlock y pedidos completados.
+### DEC-017: Despertar Reactivo de Pedidos Condicionados por E/S (R12)
+- **Problema:** Cuando un pedido no puede iniciar por falta de existencias físicas, no debe consumir CPU en espera activa ni demorar en despacharse una vez llegue el camión de suministro correspondiente.
 - **Alternativas:**
-  1. *Cola única con banderas*: Difícil de distinguir visualmente y de planificar eficientemente.
-  2. *Máquina de estados de procesos de SO*:
-     - `EN_ESPERA_STOCK`: Bloqueado esperando I/O (llegada de existencias físicas).
-     - `EN_ESPERA_RECURSOS`: Listo (Ready) en la cola de planificación para ser despachado.
-     - `EN_PROCESO`: Ejecución (Running) reteniendo recursos de trabajo.
-     - `BLOQUEADO`: Interbloqueo circular (Coffman) en espera de recursos retenidos por otro.
-     - `COMPLETADO`: Proceso terminado exitosamente.
-     - `CANCELADO`: Proceso abortado.
-- **Elección:** Máquina de 6 estados implementada en `EstadoPedido` con variables volátiles y transiciones atómicas.
-- **Fundamento Teórico:** Mapeo formal con el diagrama de transición de estados de un proceso (Silberschatz / Tanenbaum).
-
----
-
-### DEC-006: Semáforos Contadores Justos (`Semaphore(capacidad, true)`) para pools de recursos
-- **Problema:** Administrar la asignación concurrente de recursos multi-instancia (10 encargados, 6 empaques, etc.) garantizando que no se asignen más unidades que las disponibles y que los procesos no sufran inanición en la cola de espera del recurso.
-- **Alternativas:**
-  1. *Locks individuales por unidad con sondeo*: Requiere que cada hilo recorra un arreglo de locks y use `tryLock()`, generando sobrecarga de CPU y comportamiento no equitativo.
-  2. *Monitor centralizado sin justicia*: Un monitor simple con `notifyAll()` despierta a todos los hilos, y el hilo más rápido gana la contención, provocando *thundering herd problem* e inanición de hilos lentos.
-  3. *`Semaphore(capacidad, true)` de Java*: Semáforo contador de Dijkstra con cola FIFO justa interna implementada sobre el `AbstractQueuedSynchronizer` (AQS).
-- **Elección:** `Semaphore(capacidad, true)` para la contención numérica y un `ReentrantLock` ligero para asociar la unidad física específica (ej. "Montacargas-1").
-- **Fundamento Teórico:** Los semáforos justos implementan la disciplina estricta FIFO en la cola de bloqueados, garantizando la propiedad de libertad de inanición (*starvation-freedom*).
-
----
-
-### DEC-007: Prevención de Deadlock mediante adquisición Todo-o-Nada atómica
-- **Problema:** Evitar que ocurran interbloqueos durante la operación regular del centro de distribución cuando múltiples pedidos compiten por recursos compartidos.
-- **Alternativas:**
-  1. *Orden global de recursos (Jerarquía de Dijkstra)*: Obliga a adquirir los recursos en un orden numérico ascendente estricto (ej. primero ENCARGADO, luego MONTACARGAS, luego CARGA). Elimina la espera circular, pero permite retener recursos ociosos mientras se espera el siguiente.
-  2. *Adquisición Todo-o-Nada atómica con Rollback*: Un proceso debe solicitar la totalidad de sus recursos en un único intento atómico. Si algún recurso no está libre, se liberan inmediatamente todos los recursos adquiridos en el intento y el proceso vuelve a esperar.
-- **Elección:** Adquisición atómica Todo-o-Nada implementada en `GestorRecursos.intentarAdquirirTodoONada`.
-- **Fundamento Teórico:** De acuerdo con las 4 condiciones necesarias de Coffman (Exclusión Mutua, Retención y Espera, No Expropiación, Espera Circular), el interbloqueo se vuelve matemáticamente imposible si se invalida al menos una condición. La adquisición todo-o-nada niega la condición de **Retención y Espera (Hold and Wait)**, asegurando que ningún proceso retenga recursos si no puede proceder inmediatamente.
-
----
-
-### DEC-008: Concesión AutoCloseable (Patrón RAII)
-- **Problema:** Garantizar que cuando un hilo trabajador finaliza, falla o es interrumpido (por ejemplo, al ser elegido víctima en la resolución de un deadlock), libere el 100% de los recursos retenidos sin provocar fugas que bloqueen el sistema a largo plazo.
-- **Alternativas:**
-  1. *Bloques de liberación manual*: Propenso a errores humanos si existen múltiples cláusulas `return` o excepciones intermedias.
-  2. *Clase `Concesion implements AutoCloseable`*: Envuelve las asignaciones obtenidas y ejecuta la restitución en su método `close()` dentro de bloques `try-with-resources` o `try ... finally`.
-- **Elección:** `Concesion implements AutoCloseable` con liberación LIFO e idempotencia atómica con `AtomicBoolean`.
-- **Fundamento Teórico:** Principio RAII (Resource Acquisition Is Initialization). Vincula el ciclo de vida de los recursos del SO al ámbito léxico de ejecución del proceso, asegurando la invariante de conservación de permisos.
-
----
-
-### DEC-009: Despachador reactivo basado en Monitor y planificador Work-Conserving
-- **Problema:** Coordinar la asignación de pedidos en espera a los recursos disponibles minimizando la latencia de despacho y sin desperdiciar ciclos de procesador.
-- **Alternativas:**
-  1. *Bucle de espera activa (Busy-waiting)*: Quema el 100% de un núcleo de CPU consultando continuamente la lista de espera.
-  2. *Temporizador periódico ciego (Polling)*: Despacha cada N milisegundos fijos, introduciendo latencia artificial si los recursos se liberan antes.
-  3. *Monitor de sincronización con `ReentrantLock` y `Condition`*: El despachador duerme en `Condition.await()` y es despertado instantáneamente ante eventos reales (llegada de pedido, liberación de recurso por un trabajador, cambio de política).
-- **Elección:** Monitor reactivo con timeout auxiliar de 250 ms (para re-evaluación de aging).
-- **Fundamento Teórico:** Modelo de Monitores de Hoare/Brinch Hansen. El algoritmo es *work-conserving*: si el primer pedido de la cola no puede ejecutarse por falta de un recurso específico, evalúa a los siguientes candidatos factibles, impidiendo que recursos libres queden desaprovechados.
-
----
-
-### DEC-010: Algoritmo de Envejecimiento (Aging) para prevención de Inanición
-- **Problema:** En prioridad estricta, si entran continuamente pedidos de Nivel 1 o 2, los pedidos de Nivel 5 sufren inanición (starvation) indefinida.
-- **Alternativas:**
-  1. *Round-robin por nivel*: No respeta los acuerdos comerciales de prioridad para clientes que pagan más.
-  2. *Envejecimiento proporcional discreto*: Cada intervalo de tiempo $T_{aging}$ que un pedido espera sin ser atendido, su prioridad efectiva se incrementa en 1 unidad numérica hacia Nivel 1.
-- **Elección:** $NivelEfectivo = \max(1, NivelOriginal - \lfloor esperaSegundos / T_{aging} \rfloor)$.
-- **Fundamento Teórico:** Principio de envejecimiento (Silberschatz). Al aumentar monótonamente la prioridad efectiva con el tiempo de espera, se garantiza que cualquier proceso eventualmente alcance la prioridad máxima y sea despachado, erradicando la inanición.
-
----
-
-### DEC-011: Planificación SJF (Shortest Job First / SPT)
-- **Problema:** Maximizar la cantidad de pedidos despachados por unidad de tiempo y minimizar el tiempo medio de permanencia en la cola.
-- **Alternativas:**
-  1. *SJF con estimación histórica*: Complejo e innecesario dado que conocemos exactamente la cantidad de artículos.
-  2. *SJF determinista por total de unidades*: Dado que el trabajo es estrictamente proporcional a las unidades ($30\text{ s sim/unidad}$), el pedido con menor número total de unidades tiene la ráfaga más corta.
-- **Elección:** Ordenar por `totalUnidades` ascendente; desempate por nivel de servicio y FIFO.
-- **Fundamento Teórico:** Teorema de Smith / Conway: La regla SPT (Shortest Processing Time) minimiza matemáticamente la suma ponderada y no ponderada de tiempos de espera en sistemas monoprocesador/estación.
-
----
-
-### DEC-012: Planificación por Fecha Límite Más Cercana (EDF)
-- **Problema:** Reducir la tasa de incumplimiento de acuerdos SLA en pedidos con metas temporales fijas.
-- **Alternativas:**
-  1. *Prioridad fija por SLA*: No toma en cuenta cuándo llegó el pedido.
-  2. *EDF Dinámico*: $Deadline = InstanteCreacion + SLA_{nivel}$. El pedido cuya fecha límite vence antes va de primero.
-- **Elección:** `PoliticaEDF` calculando la fecha límite absoluta contra el reloj simulado.
-- **Fundamento Teórico:** Teorema de Liu y Layland (1973). EDF es el algoritmo óptimo en sistemas de tiempo real para cumplir restricciones de plazo (deadlines).
-
----
-
-### DEC-013: Acumuladores `LongAdder` para métricas de alto rendimiento
-- **Problema:** Múltiples hilos concurrentes terminando pedidos y actualizando métricas globales simultáneamente sin generar contención ni degradar el throughput.
-- **Alternativas:**
-  1. *Locks de exclusión mutua*: Serializan todas las escrituras estadísticas.
-  2. *`AtomicLong`*: Provoca colisiones continuas en el bucle CAS bajo alta concurrencia.
-  3. *`LongAdder`*: Distribuye las operaciones de suma en celdas internas asociadas a los hilos activos.
-- **Elección:** `LongAdder` para contadores globales y por nivel; `AtomicLong` solo para el cálculo de máximos (`accumulateAndGet`).
-- **Fundamento Teórico:** Mitigación de contención de memoria (*cache-line bouncing* y *false sharing*) en arquitecturas multinúcleo con memoria compartida (SMP).
+  1. *Sondeo periódico ciego (Polling)*: Desperdicia ciclos de procesador y genera latencia innecesaria.
+  2. *Señal reactiva desde el consumidor de E/S*: En cuanto el hilo de Inventario procesa un lote y actualiza las existencias físicas, emite una señal al monitor del Despachador (`despachador.despertar()`).
+- **Elección:** Notificación reactiva basada en señales de eventos.
+- **Fundamento Teórico:** Mapeo con el manejo de interrupciones de E/S en el kernel: un proceso en estado Bloqueado por E/S (`EN_ESPERA_STOCK`) pasa inmediatamente a Listo (`EN_ESPERA_RECURSOS` / Ready) tras la finalización de la transferencia de datos.
