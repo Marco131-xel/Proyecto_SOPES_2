@@ -26,6 +26,9 @@
 | DEC-015 | Asignación Indexada No Contigua y Mapa de Bits en Almacén | Administrar el espacio físico del almacén (240 celdas) evitando la fragmentación externa (R13). | 1. Asignación contigua estricta en el mismo pasillo (riesgo severo de fragmentación externa).<br>2. Asignación encadenada con punteros en cada celda.<br>3. Asignación Indexada con tabla de bloques y `BitSet` de celdas libres. | Asignación indexada no contigua: cada lote mantiene su tabla de bloques `(Ubicacion, unidades)` sobre un mapa de bits (`BitSet`). | Mapeo idéntico a la asignación indexada de inodos en UNIX y marcos de página en memoria virtual. Elimina la fragmentación externa al 100%, admitiendo lotes dispersos en pasillos no contiguos. |
 | DEC-016 | Reserva Atómica de Stock de Dos Fases (Prevención de Sobreventa) | Evitar condiciones de carrera donde dos pedidos compitan por las mismas existencias físicas en almacén. | 1. Descontar stock directamente al completar el pedido.<br>2. Verificación sin lock previo.<br>3. Protocolo de reserva atómica de dos fases: $Disponible = Existencias - Reservas$. | Reserva atómica previa bajo `lockStock`: si no hay suficiente para todas las líneas, aborta y hace rollback; si hay, reserva y luego consume al completar. | Principio de transaccionalidad atómica y exclusión mutua de recursos no renovables. Elimina condiciones de carrera de lectura-modificación-escritura (Check-then-Act), garantizando cero sobreventa. |
 | DEC-017 | Despertar Reactivo de Pedidos Condicionados por E/S (R12) | Activar pedidos en `EN_ESPERA_STOCK` tan pronto ingrese mercancía al almacén sin sondeo activo. | 1. Hilos de pedido en busy-waiting consultando stock.<br>2. Temporizador periódico de reintento de stock.<br>3. Señal reactiva: el hilo consumidor de Inventario notifica al monitor del Despachador. | Inventario llama a `despachador.despertar()` inmediatamente después de incorporar un lote físico al almacén. | Paradigma de E/S orientada a interrupciones / señales de finalización de E/S. Transición directa de estado `EN_ESPERA_STOCK` (I/O Wait) a `EN_ESPERA_RECURSOS` (Ready Queue). |
+| DEC-018 | Algoritmo Matricial de Detección de Deadlock con Múltiples Instancias (R14) | Detectar formalmente ciclos de bloqueo mutuo cuando existen múltiples instancias por tipo de recurso. | 1. Detección por timeout arbitrario (falsos positivos).<br>2. Búsqueda de ciclos simples en grafos dirigidos (solo válida para instancia única).<br>3. Algoritmo de matrices $Disponible$, $Asignacion$ y $Solicitud$. | Algoritmo matricial de marcado de Silberschatz / Coffman ejecutado cada 500 ms sobre los procesos en ejecución. | Algoritmo formal de Sistemas Operativos para detección de interbloqueos con recursos multi-instancia de complejidad $O(m \times n^2)$. Deduce formalmente qué procesos no podrán terminar jamás con el inventario de recursos disponible. |
+| DEC-019 | Provocación Controlada y Determinista de Deadlock (R14) | Provocar un interbloqueo reproducible al 100% para demostración en defensa oral. | 1. Generar miles de pedidos aleatorios esperando que choquen por azar.<br>2. Simulación gráfica ficticia sin bloqueo real de hilos.<br>3. Aislamiento de unidades sobrantes a modo MANTENIMIENTO + inyección de pedidos con orden cruzado de retención y espera. | Modo sin prevención + unidades en mantenimiento hasta dejar 1 Montacargas y 1 Carga + Pedido A [MTC, CRG] y Pedido B [CRG, MTC]. | Demostración práctica de las 4 Condiciones de Coffman: exclusión mutua estricta (1 unidad), retención y espera (pausa entre adquisiciones), no expropiación (hilos en `semaphore.acquire()`) y espera circular. |
+| DEC-020 | Recuperación Manual por Terminación de Víctima (Rollback y Reencolado / R15) | Resolver el interbloqueo permitiendo que el usuario elija qué operación continúa. | 1. Abortar todos los procesos del sistema.<br>2. Elección automática arbitraria.<br>3. Interrupción controlada de la víctima (`Thread.interrupt`), rollback mediante `Concesion` y reencolado. | El usuario selecciona el pedido ganador; la víctima es interrumpida, libera lo retenido de inmediato en su `finally` y vuelve a la cola de espera (`vecesReencolado++`). | Estrategia de recuperación por terminación parcial de procesos con punto de restauración (Checkpointing / Rollback). La liberación de la víctima destruye la espera circular y permite al ganador completar exitosamente. |
 
 ---
 
@@ -77,3 +80,34 @@ $$\text{Stock Libre} = \text{Existencias Físicas} - \text{Stock Reservado} \ge 
   2. *Señal reactiva desde el consumidor de E/S*: En cuanto el hilo de Inventario procesa un lote y actualiza las existencias físicas, emite una señal al monitor del Despachador (`despachador.despertar()`).
 - **Elección:** Notificación reactiva basada en señales de eventos.
 - **Fundamento Teórico:** Mapeo con el manejo de interrupciones de E/S en el kernel: un proceso en estado Bloqueado por E/S (`EN_ESPERA_STOCK`) pasa inmediatamente a Listo (`EN_ESPERA_RECURSOS` / Ready) tras la finalización de la transferencia de datos.
+
+---
+
+### DEC-018: Algoritmo Matricial de Detección de Deadlock (R14)
+- **Problema:** En presencia de recursos con múltiples instancias (3 montacargas, 2 áreas de carga, etc.), la detección simple de ciclos sobre un grafo de asignación puede arrojar falsos positivos (un ciclo no implica interbloqueo si otra instancia del recurso se libera).
+- **Alternativas:**
+  1. *Detección por watchdog / timeout*: Si un hilo tarda más de N segundos, se asume bloqueado. Inadecuado: confunde procesos de larga duración con interbloqueos genuinos.
+  2. *Algoritmo de detección matricial de Silberschatz*: Utiliza el vector de recursos disponibles $V$, la matriz de asignación $A$ y la matriz de solicitud $S$. Simula el despacho optimista de procesos que pueden terminar; los que no logran terminar son formalmente declarados en interbloqueo.
+- **Elección:** Algoritmo matricial implementado en `DetectorDeadlock.java` con generación del grafo RAG (`AristaAsignacion`).
+- **Fundamento Teórico:** Algoritmo canónico de detección de interbloqueos para múltiples instancias. Modela el estado global del sistema operativo identificando exactamente el conjunto de procesos atrapados en espera circular irresoluble.
+
+---
+
+### DEC-019: Provocación Controlada y Determinista de Deadlock (R14)
+- **Problema:** Los interbloqueos suelen ser no deterministas y difíciles de reproducir en una defensa ante profesores si las probabilidades de concurrencia temporal no coinciden exactamente.
+- **Alternativas:**
+  1. *Simulación cosmética visual*: Pintar en la UI que hay deadlock sin que los hilos estén realmente bloqueados en el sistema operativo. (Inaceptable para SO2).
+  2. *Saturación de instancias y colisión directa*: Reducir temporalmente las unidades disponibles de Montacargas y Carga a exactamente 1 unidad cada una mediante el estado `MANTENIMIENTO`, e inyectar Pedido A (Pesado) con orden $[MTC, CRG]$ y Pedido B (Voluminoso) con orden $[CRG, MTC]$.
+- **Elección:** Saturación a 1 y 1 + órdenes cruzados en modo sin prevención.
+- **Fundamento Teórico:** Al dejar 1 sola unidad disponible de cada recurso, el problema se reduce al caso clásico de instancia única donde las 4 condiciones de Coffman se fuerzan con 100% de certeza: A retiene MTC y espera CRG; B retiene CRG y espera MTC.
+
+---
+
+### DEC-020: Recuperación Manual por Terminación y Retroceso de Víctima (R15)
+- **Problema:** Una vez detectado el interbloqueo, el operador debe poder resolverlo de manera dirigida permitiendo que el proceso elegido continúe y el otro retroceda limpiamente.
+- **Alternativas:**
+  1. *Terminar el proceso completo sin reencolar*: Pérdida del pedido del cliente.
+  2. *Expropiación de recursos en caliente sin interrumpir el hilo*: En Java, `Semaphore` no permite arrebatar un permiso a un hilo sin su cooperación.
+  3. *Interrupción controlada (`Thread.interrupt`)*: La víctima seleccionada captura `InterruptedException`, ejecuta su cláusula `finally` liberando de inmediato su concesión (`concesion.close()`) y se reencola (`vecesReencolado++`).
+- **Elección:** Interrupción de la víctima con liberación LIFO e incremento de contador de reencolados.
+- **Fundamento Teórico:** Recuperación de interbloqueos por terminación selectiva de procesos y retroceso a punto de control (Rollback to Ready State). La liberación de los recursos de la víctima rompe la condición de Espera Circular, permitiendo al proceso ganador avanzar y finalizar.

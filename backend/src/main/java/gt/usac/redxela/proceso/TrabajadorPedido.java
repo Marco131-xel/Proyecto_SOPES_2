@@ -50,8 +50,11 @@ public class TrabajadorPedido implements Runnable {
                     // Pausa entre adquisiciones para permitir la contención y reproducibilidad de deadlocks
                     Thread.sleep(ConfiguracionSimulacion.PAUSA_ENTRE_ADQUISICIONES_MS);
 
+                    pedido.setRecursoSolicitadoActual(tipo);
                     UnidadRecurso unidad = gestorRecursos.adquirirUnoAUno(
                             tipo, pedido.getId(), simClock.ahoraSimuladoSegundos());
+                    pedido.setRecursoSolicitadoActual(null);
+
                     concesionEfectiva.agregar(gestorRecursos.getPool(tipo), unidad);
                     pedido.registrarUnidadRetenida(unidad.getNombreLegible());
                 }
@@ -93,6 +96,7 @@ public class TrabajadorPedido implements Runnable {
                 concesionEfectiva.close();
             }
             pedido.limpiarUnidadesRetenidas();
+            pedido.setRecursoSolicitadoActual(null);
 
             if (onFinalizado != null) {
                 onFinalizado.run();

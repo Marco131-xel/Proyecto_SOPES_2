@@ -37,6 +37,7 @@ public class Pedido {
     private volatile Long instanteInicio; // Segundos simulados
     private volatile Long instanteFin;    // Segundos simulados
     private volatile double progresoPorcentaje; // 0.0 a 100.0
+    private volatile TipoRecurso recursoSolicitadoActual; // Para matriz de Solicitud en detección de Deadlock
 
     private final AtomicInteger vecesReencolado = new AtomicInteger(0);
 
@@ -147,6 +148,14 @@ public class Pedido {
 
     public void limpiarUnidadesRetenidas() {
         unidadesRecursosRetenidas.clear();
+    }
+
+    public void setRecursoSolicitadoActual(TipoRecurso recurso) {
+        this.recursoSolicitadoActual = recurso;
+    }
+
+    public TipoRecurso getRecursoSolicitadoActual() {
+        return recursoSolicitadoActual;
     }
 
     // --- Getters ---
