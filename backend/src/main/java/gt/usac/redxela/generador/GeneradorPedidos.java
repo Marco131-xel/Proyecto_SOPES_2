@@ -83,8 +83,7 @@ public class GeneradorPedidos implements Runnable {
 
                 // Generar un pedido aleatorio realista
                 Pedido pedido = generarPedidoAleatorio();
-                listaEspera.agregar(pedido);
-                despachador.despertar();
+                despachador.registrarPedido(pedido);
 
                 // Calcular intervalo de llegada (en segundos simulados)
                 double intervaloSimuladoSegundos = 60.0 / Math.max(0.1, tasaPedidosPorMinutoSimulado);

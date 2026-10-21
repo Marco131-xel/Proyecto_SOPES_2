@@ -61,21 +61,24 @@ public class Lote {
      * Corresponde a la capacidad no aprovechada en la última celda del lote.
      */
     public int calcularFragmentacionInterna() {
-        int capacidadMaximaPorCelda = producto.unidadesPorUbicacion();
-        int residuo = cantidadTotal % capacidadMaximaPorCelda;
-        return residuo == 0 ? 0 : (capacidadMaximaPorCelda - residuo);
+        // Una ubicación liberada puede reasignarse: sólo cuentan las que aún pertenecen al lote.
+        return tablaAsignacion.stream().map(e -> e.ubicacion().snapshot())
+                .filter(u -> id.equals(u.loteId()))
+                .mapToInt(u -> u.capacidadMaxima() - u.cantidadOcupada()).sum();
     }
 
     public LoteSnapshot snapshot() {
         List<LoteSnapshot.EntradaSnapshot> entradasSnap = tablaAsignacion.stream()
-                .map(e -> new LoteSnapshot.EntradaSnapshot(e.ubicacion().getId(), e.unidadesAlmacenadas()))
+                .map(e -> e.ubicacion().snapshot())
+                .filter(u -> id.equals(u.loteId()))
+                .map(u -> new LoteSnapshot.EntradaSnapshot(u.id(), u.cantidadOcupada()))
                 .toList();
 
         return new LoteSnapshot(
                 id,
                 producto.id(),
                 producto.nombre(),
-                cantidadTotal,
+                entradasSnap.stream().mapToInt(LoteSnapshot.EntradaSnapshot::unidades).sum(),
                 instanteIngreso,
                 entradasSnap,
                 calcularFragmentacionInterna()

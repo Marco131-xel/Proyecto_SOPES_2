@@ -136,9 +136,15 @@ public class SimClock {
         if (duracionSimuladaMs <= 0) {
             return;
         }
-        double factorActual = getFactor();
-        long duracionRealMs = Math.max(1L, (long) (duracionSimuladaMs / factorActual));
-        Thread.sleep(duracionRealMs);
+        // Esperar contra el reloj simulado hace que pausa y cambios de factor
+        // afecten también al trabajo en curso, no sólo a las próximas esperas.
+        long objetivo = ahoraSimuladoMs() + duracionSimuladaMs;
+        while (true) {
+            long restante = objetivo - ahoraSimuladoMs();
+            if (restante <= 0) return;
+            long esperaReal = isPausado() ? 100L : Math.max(1L, (long) Math.ceil(restante / getFactor()));
+            Thread.sleep(Math.min(100L, esperaReal));
+        }
     }
 
     /**

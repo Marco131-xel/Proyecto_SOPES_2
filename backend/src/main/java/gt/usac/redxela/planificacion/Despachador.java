@@ -35,6 +35,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component
 public class Despachador implements Runnable {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private gt.usac.redxela.eventos.RegistroEventos eventos;
+
+    private void registrarEvento(String tipo, String mensaje) {
+        if (eventos != null) eventos.registrar(tipo, mensaje);
+    }
+
 
     private final ListaEspera listaEspera;
     private final GestorRecursos gestorRecursos;
@@ -103,6 +110,15 @@ public class Despachador implements Runnable {
         despertar();
         if (hiloDespachador != null) {
             hiloDespachador.interrupt();
+            try { hiloDespachador.join(2000); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        // No lanzar más trabajadores durante el cierre; interrumpir libera sus concesiones.
+        List<Thread> trabajadores = List.copyOf(hilosTrabajadores.values());
+        trabajadores.forEach(Thread::interrupt);
+        for (Thread trabajador : trabajadores) {
+            try { trabajador.join(2000); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); break; }
         }
     }
 
@@ -191,7 +207,16 @@ public class Despachador implements Runnable {
         }
     }
 
+    /** Entrada común para que pedidos manuales, automáticos y del escenario cuenten igual. */
+    public void registrarPedido(Pedido pedido) {
+        estadisticas.registrarPedidoCreado(pedido);
+        registrarEvento("PEDIDO", pedido.getId() + " creado: " + pedido.getTotalUnidades() + " unidades");
+        listaEspera.agregar(pedido);
+        despertar();
+    }
+
     private void lanzarTrabajador(Pedido pedido, Concesion concesionPrevia) {
+        registrarEvento("DESPACHO", pedido.getId() + " despachado");
         pedidosEnProceso.put(pedido.getId(), pedido);
 
         Runnable callbackFin = () -> {
@@ -213,15 +238,17 @@ public class Despachador implements Runnable {
 
                 if (estadisticas != null) {
                     estadisticas.registrarPedidoCompletado(pedido, finSimulado);
+                    registrarEvento("COMPLETADO", pedido.getId() + " completado");
                 }
             } else if (pedido.getEstado() == EstadoPedido.EN_ESPERA_RECURSOS) {
                 // Si fue reencolado o interrumpido, liberamos la reserva de stock
                 if (inventario != null) {
                     inventario.cancelarReserva(pedido);
                 }
-                listaEspera.agregar(pedido);
+                if (activo) listaEspera.agregar(pedido);
                 if (estadisticas != null) {
                     estadisticas.registrarReencolado();
+                    registrarEvento("REENCOLADO", pedido.getId() + " vuelve a espera tras liberar recursos");
                 }
             } else if (pedido.getEstado() == EstadoPedido.CANCELADO) {
                 if (inventario != null) {

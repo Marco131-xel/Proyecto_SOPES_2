@@ -31,6 +31,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Component
 public class DetectorDeadlock implements Runnable {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private gt.usac.redxela.eventos.RegistroEventos eventos;
+
+    private void registrarEvento(String tipo, String mensaje) {
+        if (eventos != null) eventos.registrar(tipo, mensaje);
+    }
+
 
     private final Despachador despachador;
     private final GestorRecursos gestorRecursos;
@@ -176,7 +183,8 @@ public class DetectorDeadlock implements Runnable {
 
         for (int i = 0; i < n; i++) {
             // Un proceso está en deadlock si fin[i] == false y tiene una solicitud pendiente
-            if (!fin[i] && procesos.get(i).getRecursoSolicitadoActual() != null) {
+            TipoRecurso req = procesos.get(i).getRecursoSolicitadoActual();
+            if (!fin[i] && req != null) {
                 Pedido p = procesos.get(i);
                 pedidosBloqueados.add(p);
                 p.marcarBloqueado();
@@ -187,13 +195,13 @@ public class DetectorDeadlock implements Runnable {
                 }
 
                 // Arista de Solicitud (Proceso -> Recurso)
-                TipoRecurso req = p.getRecursoSolicitadoActual();
                 grafo.add(new AristaAsignacion(p.getId(), req.getNombreLegible(), AristaAsignacion.TipoArista.SOLICITUD));
                 recursosDisputadosSet.add(req.getNombreLegible());
             }
         }
 
         if (!pedidosBloqueados.isEmpty()) {
+            if (!ultimoInforme.hayConflicto()) registrarEvento("DEADLOCK", "Conflicto detectado: " + pedidosBloqueados.stream().map(Pedido::getId).toList());
             StringBuilder explicacion = new StringBuilder();
             explicacion.append("¡INTERBLOQUEO DETECTADO (DEADLOCK)! ")
                     .append(pedidosBloqueados.size())

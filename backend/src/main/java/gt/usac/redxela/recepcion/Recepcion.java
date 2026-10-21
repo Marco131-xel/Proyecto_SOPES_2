@@ -35,6 +35,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component
 public class Recepcion implements Runnable {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private gt.usac.redxela.eventos.RegistroEventos eventos;
+
+    private void registrarEvento(String tipo, String mensaje) {
+        if (eventos != null) eventos.registrar(tipo, mensaje);
+    }
+
 
     private final GestorRecursos gestorRecursos;
     private final SimClock simClock;
@@ -99,6 +106,7 @@ public class Recepcion implements Runnable {
             lockPatio.unlock();
         }
 
+        registrarEvento("RECEPCION", camion.id() + ": " + cantidad + " unidades de " + producto.nombre());
         return camion;
     }
 

@@ -45,6 +45,12 @@ public final class ConfiguracionSimulacion {
     /** Ventana máxima de pedidos completados retenidos en memoria para la UI. */
     public static final int MAX_PEDIDOS_COMPLETADOS_HISTORICO = 200;
 
+    /** Ventana acotada del registro compartido por SSE y el sondeo puntual. */
+    public static final int MAX_EVENTOS_HISTORICO = 100;
+
+    /** Frecuencia de publicación de la telemetría en milisegundos reales. */
+    public static final long INTERVALO_PUBLICACION_ESTADO_MS = 500;
+
     // --- Parámetros de Deadlock ---
     /** Pausa en milisegundos reales entre adquisiciones sucesivas en modo SIN PREVENCIÓN. */
     public static final long PAUSA_ENTRE_ADQUISICIONES_MS = 1500;

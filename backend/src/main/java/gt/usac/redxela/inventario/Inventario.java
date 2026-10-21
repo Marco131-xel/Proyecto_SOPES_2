@@ -47,6 +47,13 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Component
 public class Inventario implements Runnable {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private gt.usac.redxela.eventos.RegistroEventos eventos;
+
+    private void registrarEvento(String tipo, String mensaje) {
+        if (eventos != null) eventos.registrar(tipo, mensaje);
+    }
+
 
     public record LotePendiente(String loteId, Producto producto, int cantidad, long instante) {}
 
@@ -133,6 +140,7 @@ public class Inventario implements Runnable {
                 lotesEnAlmacen.add(loteAsignado.get());
                 existenciasFisicas.get(producto.id()).addAndGet(mensaje.cantidad());
                 totalMensajesProcesados.incrementAndGet();
+                registrarEvento("INVENTARIO", "Lote incorporado al almacén");
 
                 // R12: Notificación al despachador para re-evaluar pedidos en espera de este producto
                 if (despachador != null) {
@@ -158,11 +166,12 @@ public class Inventario implements Runnable {
     public boolean intentarReservarStock(Pedido pedido) {
         lockStock.lock();
         try {
-            // Fase de verificación
-            for (LineaPedido lp : pedido.getLineas()) {
-                String pid = lp.producto().id();
-                int disponible = getDisponible(pid);
-                if (disponible < lp.cantidad()) {
+            // Agrupar líneas repetidas antes de comprobar disponibilidad evita sobreventa.
+            Map<String, Integer> cantidades = new HashMap<>();
+            for (LineaPedido lp : pedido.getLineas()) cantidades.merge(lp.producto().id(), lp.cantidad(), Math::addExact);
+            for (var entrada : cantidades.entrySet()) {
+                int disponible = getDisponible(entrada.getKey());
+                if (disponible < entrada.getValue()) {
                     return false; // Stock insuficiente para esta línea
                 }
             }
@@ -214,7 +223,7 @@ public class Inventario implements Runnable {
                     Lote lote = itLotes.next();
                     if (lote.getProducto().id().equals(pid)) {
                         for (EntradaAsignacion entrada : lote.getTablaAsignacion()) {
-                            if (entrada.ubicacion().getCantidadOcupada() > 0) {
+                            if (lote.getId().equals(entrada.ubicacion().getLoteIdActual()) && entrada.ubicacion().getCantidadOcupada() > 0) {
                                 int enCelda = entrada.ubicacion().getCantidadOcupada();
                                 if (cantidadAConsumir >= enCelda) {
                                     cantidadAConsumir -= enCelda;
@@ -232,6 +241,8 @@ public class Inventario implements Runnable {
                 }
             }
 
+            lotesEnAlmacen.removeIf(lote -> lote.getUbicaciones().stream()
+                    .noneMatch(u -> lote.getId().equals(u.getLoteIdActual())));
             // Si se liberó espacio en el almacén, intentamos procesar lotes pendientes
             reintentarLotesPendientes();
 
@@ -252,6 +263,7 @@ public class Inventario implements Runnable {
                 lotesEnAlmacen.add(asignado.get());
                 existenciasFisicas.get(pend.producto().id()).addAndGet(pend.cantidad());
                 totalMensajesProcesados.incrementAndGet();
+                registrarEvento("INVENTARIO", "Lote incorporado al almacén");
 
                 if (despachador != null) {
                     despachador.despertar();

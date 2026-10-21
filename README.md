@@ -68,3 +68,17 @@ proyecto_final/
    npm run dev
    ```
    La aplicación web estará disponible en `http://localhost:5173`. Las peticiones `/api` se redirigen automáticamente al backend.
+
+## 4. Estado de las fases
+
+Las fases 0–5 están registradas en Git. La Fase 6 incorpora REST, SSE con respaldo por sondeo, controles en vivo, registro manual, recursos, cola, métricas Recharts, mapa del almacén, recepción, grafo de deadlock y registro de eventos.
+
+La revisión visual local sigue pendiente; el entorno del agente impide abrir puertos y ejecutar el navegador. El comparador funcional corresponde a la Fase 7. Consulta [la verificación de Fase 6](docs/verificacion_fase6.md) para el recorrido y las condiciones del escenario de deadlock.
+
+Para verificar el frontend (Node 22):
+
+```bash
+cd frontend
+npm test
+npm run build
+```

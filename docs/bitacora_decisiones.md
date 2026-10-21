@@ -111,3 +111,40 @@ $$\text{Stock Libre} = \text{Existencias Físicas} - \text{Stock Reservado} \ge 
   3. *Interrupción controlada (`Thread.interrupt`)*: La víctima seleccionada captura `InterruptedException`, ejecuta su cláusula `finally` liberando de inmediato su concesión (`concesion.close()`) y se reencola (`vecesReencolado++`).
 - **Elección:** Interrupción de la víctima con liberación LIFO e incremento de contador de reencolados.
 - **Fundamento Teórico:** Recuperación de interbloqueos por terminación selectiva de procesos y retroceso a punto de control (Rollback to Ready State). La liberación de los recursos de la víctima rompe la condición de Espera Circular, permitiendo al proceso ganador avanzar y finalizar.
+
+---
+
+### Fase 6 — API REST, SSE e integración React (21/10/2026)
+
+Se retomaron los cambios sin commit que quedaron después de `8ce46b6` (Fase 5). Por instrucción del estudiante, **el agente no crea commits ni prepara el índice**. La implementación de F6 está integrada; su revisión visual en navegador sigue pendiente. El comparador funcional pertenece a F7.
+
+### DEC-021: Contratos de telemetría y errores HTTP
+- **Problema:** React esperaba un objeto con nivel/nombre/SLA, mientras Jackson serializaba `NivelServicio` como texto; además, algunos comandos trataban errores HTTP como éxitos.
+- **Alternativas:** Cambiar la serialización global del dominio o exponer DTOs explícitos en la frontera HTTP.
+- **Elección:** `ClienteDTO`, `EstadoSistema` y respuestas JSON con `mensaje`; validación de niveles, velocidad, tasa, cantidades y órdenes de adquisición. Respuestas 400 para datos inválidos, 404 para entidades ausentes y 409 para conflictos de estado.
+- **Fundamento:** Separación entre representación e implementación. La API transmite valores y copias de cada componente, sin entregar a la UI sus estructuras internas de sincronización. Las instantáneas de componentes se toman por separado: no constituyen una transacción global del motor.
+
+### DEC-022: SSE con respaldo por sondeo y cierre controlado
+- **Problema:** Una desconexión dejaba datos antiguos en pantalla sin una alternativa de actualización; una excepción no capturada en una tarea periódica podía detener futuras publicaciones.
+- **Alternativas:** Sólo sondeo, sólo SSE o SSE con sondeo durante reconexión.
+- **Elección:** Evento `estado` cada 500 ms, reconexión nativa de `EventSource` y `GET /api/estado` cada 1,5 s durante la desconexión. La pantalla distingue SSE, sondeo y falta de conexión. Se cancelan temporizadores, consultas pendientes, emisores y publicador al cerrar.
+- **Fundamento:** Comunicación unidireccional por mensajes; tolerancia a fallos del transporte sin cambiar el motor concurrente. Cada cliente conserva como máximo una consulta de respaldo en curso.
+
+### DEC-023: Registro acotado de eventos reales
+- **Problema:** Inferir eventos comparando fotos cada 500 ms puede omitir pedidos breves o transiciones entre publicaciones.
+- **Alternativas:** Reconstruir eventos en React o registrarlos donde ocurren.
+- **Elección:** `RegistroEventos` mantiene los últimos 100 eventos con secuencia e instante simulado, protegido por monitor. Despacho, recepción, inventario, detector y resolución registran eventos reales. La misma foto los entrega por SSE y sondeo.
+- **Fundamento:** Exclusión mutua para actualización de estructuras compartidas y uso acotado de memoria. `Despachador.registrarPedido` centraliza el ingreso y contabiliza pedidos manuales, automáticos y del escenario una sola vez.
+
+### DEC-024: Consistencia al operar desde la interfaz
+- **Problema:** La pausa detenía el reloj visible pero las esperas ya iniciadas terminaban; líneas repetidas podían reservar por encima del stock; los lotes seguían mostrando celdas liberadas o reutilizadas.
+- **Alternativas:** Impedir estos usos en el formulario o mantener las invariantes en el motor.
+- **Elección:** Esperas que consultan el reloj simulado durante el trabajo; suma de cantidades por producto antes de reservar; validación de que el orden de adquisición sea una permutación exacta de los recursos; fotografías de lotes que incluyen sólo sus celdas actuales y retiro de lotes agotados. Al cerrar se interrumpen y esperan los trabajadores para liberar concesiones.
+- **Fundamento:** Una interfaz no sustituye las invariantes de concurrencia. La comprobación y reserva permanecen dentro de `lockStock`; la identidad del lote evita tratar una ubicación reutilizada como pertenencia del lote anterior.
+
+### Verificación de F6 y límite de alcance
+- Suite Java: 31 pruebas sin errores, incluidas 8 de F6 contra el motor real mediante MockMvc. Incluyen SSE inicial, clientes, catálogo, pedido, recepción, validaciones, escenario/resolución HTTP, reservas repetidas, lotes reutilizados, contadores e historial y pausa del reloj.
+- Frontend: 3 pruebas de transporte para errores HTTP, conmutación SSE/sondeo y cancelación al desmontar; compilación TypeScript/Vite.
+- Mockito usa `mock-maker-subclass` en pruebas: no necesitamos mockear clases finales ni adjuntar un agente a la JVM; esto evita el fallo de auto-adjunción del entorno restringido.
+- El entorno del agente deniega sockets locales (`Operation not permitted`) y el lanzamiento del navegador. No se afirma una revisión visual ni una demo con ambos servidores conectados. Recorrido pendiente en `docs/verificacion_fase6.md`.
+- El panel de comparación identifica F7 y no muestra resultados inventados. Los manuales y la revisión general de calidad corresponden a F8.

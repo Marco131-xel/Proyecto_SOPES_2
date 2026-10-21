@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/api.test.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.453.0",

@@ -88,9 +88,8 @@ public class GestorEscenarioDeadlock {
                 List.of(TipoRecurso.CARGA, TipoRecurso.MONTACARGAS, TipoRecurso.EMPAQUE)
         );
 
-        listaEspera.agregar(pedidoA);
-        listaEspera.agregar(pedidoB);
-        despachador.despertar();
+        despachador.registrarPedido(pedidoA);
+        despachador.registrarPedido(pedidoB);
 
         return List.of(pedidoA, pedidoB);
     }

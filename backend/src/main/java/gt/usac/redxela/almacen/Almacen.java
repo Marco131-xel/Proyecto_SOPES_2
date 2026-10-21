@@ -120,7 +120,12 @@ public class Almacen {
         rwLock.writeLock().lock();
         try {
             int idx = ubicacion.getIndiceLineal();
+            String loteId = ubicacion.getLoteIdActual();
             ubicacion.liberar();
+            Lote lote = loteId == null ? null : lotes.get(loteId);
+            if (lote != null && lote.getUbicaciones().stream().noneMatch(u -> loteId.equals(u.getLoteIdActual()))) {
+                lotes.remove(loteId);
+            }
             mapaBitsLibres.set(idx); // Reintegramos el bit libre (bit = 1)
         } finally {
             rwLock.writeLock().unlock();
@@ -136,7 +141,7 @@ public class Almacen {
             Lote lote = lotes.remove(loteId);
             if (lote != null) {
                 for (EntradaAsignacion entrada : lote.getTablaAsignacion()) {
-                    liberarUbicacion(entrada.ubicacion());
+                    if (loteId.equals(entrada.ubicacion().getLoteIdActual())) liberarUbicacion(entrada.ubicacion());
                 }
             }
         } finally {

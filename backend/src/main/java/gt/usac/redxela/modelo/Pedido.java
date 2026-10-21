@@ -71,7 +71,8 @@ public class Pedido {
         Set<TipoRecurso> recursosUnion = EnumSet.noneOf(TipoRecurso.class);
 
         for (LineaPedido lp : this.lineas) {
-            acumuladorUnidades += lp.cantidad();
+            try { acumuladorUnidades = Math.addExact(acumuladorUnidades, lp.cantidad()); }
+            catch (ArithmeticException e) { throw new IllegalArgumentException("Demasiadas unidades en el pedido"); }
             recursosUnion.addAll(lp.producto().tipoMercancia().getRecursosRequeridos());
         }
 
@@ -84,6 +85,10 @@ public class Pedido {
         // Si se provee orden personalizado, se valida que cubra los recursos requeridos;
         // de lo contrario se preserva un orden determinista por defecto.
         if (ordenAdquisicionPersonalizado != null && !ordenAdquisicionPersonalizado.isEmpty()) {
+            if (ordenAdquisicionPersonalizado.size() != recursosUnion.size()
+                    || !new HashSet<>(ordenAdquisicionPersonalizado).equals(recursosUnion)) {
+                throw new IllegalArgumentException("El orden debe incluir cada recurso requerido exactamente una vez: " + recursosUnion);
+            }
             this.ordenAdquisicion = List.copyOf(ordenAdquisicionPersonalizado);
         } else {
             List<TipoRecurso> listaOrden = new ArrayList<>(this.recursosRequeridos);
