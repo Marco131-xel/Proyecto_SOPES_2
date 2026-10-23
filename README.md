@@ -71,9 +71,9 @@ proyecto_final/
 
 ## 4. Estado de las fases
 
-Las fases 0–5 están registradas en Git. La Fase 6 incorpora REST, SSE con respaldo por sondeo, controles en vivo, registro manual, recursos, cola, métricas Recharts, mapa del almacén, recepción, grafo de deadlock y registro de eventos.
+Las fases 0–6 están registradas en Git. La Fase 6 incorpora REST, SSE con respaldo por sondeo, controles en vivo, registro manual, recursos, cola, métricas Recharts, mapa del almacén, recepción, grafo de deadlock y registro de eventos.
 
-La revisión visual local sigue pendiente; el entorno del agente impide abrir puertos y ejecutar el navegador. El comparador funcional corresponde a la Fase 7. Consulta [la verificación de Fase 6](docs/verificacion_fase6.md) para el recorrido y las condiciones del escenario de deadlock.
+La revisión visual local sigue pendiente; el entorno del agente impide abrir puertos y ejecutar el navegador. La Fase 7 incorpora el comparador funcional de políticas: configuración de carga y semilla, ejecuciones aisladas, tabla y gráfica por nivel. Consulta [la verificación de Fase 7](docs/verificacion_fase7.md) y [los resultados en el borrador del Manual Técnico](docs/manual_tecnico.md). Consulta [la verificación de Fase 6](docs/verificacion_fase6.md) para el recorrido y las condiciones del escenario de deadlock.
 
 Para verificar el frontend (Node 22):
 

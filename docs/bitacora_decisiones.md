@@ -148,3 +148,31 @@ Se retomaron los cambios sin commit que quedaron después de `8ce46b6` (Fase 5).
 - Mockito usa `mock-maker-subclass` en pruebas: no necesitamos mockear clases finales ni adjuntar un agente a la JVM; esto evita el fallo de auto-adjunción del entorno restringido.
 - El entorno del agente deniega sockets locales (`Operation not permitted`) y el lanzamiento del navegador. No se afirma una revisión visual ni una demo con ambos servidores conectados. Recorrido pendiente en `docs/verificacion_fase6.md`.
 - El panel de comparación identifica F7 y no muestra resultados inventados. Los manuales y la revisión general de calidad corresponden a F8.
+
+---
+
+### Fase 7 — Comparador de políticas (21/10/2026)
+
+Se continuó después del commit del estudiante `b84dc9f` (Fase 6). Se implementaron motor aislado, REST asíncrono y panel React. Se mantiene la instrucción de no crear commits ni preparar el índice. La revisión visual continúa pendiente.
+
+### DEC-025: Reloj lógico coordinado con trabajadores reales
+- **Problema:** misma semilla no garantiza métricas idénticas si el tiempo depende de `Thread.sleep` y del orden de ejecución del SO.
+- **Alternativas:** medir corridas reales aceleradas aceptando dispersión; reemplazar el trabajo por un bucle secuencial; coordinar los trabajadores existentes con un reloj lógico.
+- **Elección:** `RelojComparativo` avanza por llegadas y finalizaciones. Cada `TrabajadorPedido` sigue siendo un hilo real y retiene concesiones sobre los semáforos reales; `Condition` sincroniza al conductor con el reposo de los trabajadores. Cada hilo acumula sus plazos propios; todas las finalizaciones del instante liberan antes del nuevo despacho.
+- **Fundamento:** ejecución concurrente coordinada, exclusión mutua y comunicación mediante condiciones. Se elimina del dato experimental la variación del reloj de pared sin cambiar el trabajo proporcional ni las políticas. Se reutilizan `TrabajadorPedido`, `GestorRecursos`, `ListaEspera`, políticas y `Estadisticas`; el conductor compara candidatos factibles ante eventos de llegada/liberación.
+
+### DEC-026: Aislamiento y carga experimental controlada
+- **Problema:** comparar sobre el motor en vivo alteraría inventario, reservas, métricas e IDs y mezclaría cargas distintas.
+- **Alternativas:** pausar y reiniciar el estado global o crear objetos independientes por política.
+- **Elección:** `SimuladorComparativo` sin Spring genera una carga inmutable con catálogo ordenado, semilla local y huella SHA-256. Cada corrida crea pedidos con IDs `CMP-*`, reloj, cola, recursos y estadísticas nuevos. Stock suficiente y prevención activa aíslan la variable política. Se conserva sólo un resultado y se limita la carga a 1000 pedidos.
+- **Fundamento:** control de variables para comparación de planificadores; el secuencial global y los componentes vivos nunca se reinician. Las métricas incluyen espera por nivel, máximo, SLA, throughput, ocupación acumulada y espera superior a 2× SLA. Se documenta el caso Exprés (objetivo 0) y que una carga finita no prueba inanición indefinida.
+
+### DEC-027: Trabajo asíncrono y conclusión basada en resultados
+- **Problema:** un POST bloqueante dificulta la UI; múltiples clientes pueden acumular experimentos, y una recomendación fija no refleja la carga elegida.
+- **Alternativas:** cola ilimitada de trabajos, petición larga o admisión exclusiva con consulta de estado.
+- **Elección:** POST devuelve 202, GET consulta; un ejecutor acepta un único trabajo y rechaza solapamientos con 409. React recupera el trabajo al volver a la pestaña y cancela sólo su consulta al desmontarse. La conclusión recomienda por SLA y desempata por espera media, explicando sus límites. Empates totales conservan el orden fijo de políticas.
+- **Fundamento:** separación entre admisión, ejecución y observación; uso acotado de recursos y recuperación del cliente sin duplicar trabajos. Se corrigieron comentarios de SJF/EDF para no extrapolar garantías de un modelo ideal a múltiples recursos sin expropiación.
+
+### Evidencia de F7
+
+39 pruebas Java y 5 del frontend aprobadas; TypeScript/Vite compila. Se verificaron repetibilidad exacta con 300 pedidos, cálculos manuales, paralelismo limitado por recursos, cero hilos residuales, exclusión de trabajos, cancelación, errores HTTP y aislamiento respecto al sistema en vivo. Se ejecutó también el comparador desde un programa Java sin Spring para registrar resultados reales en `docs/manual_tecnico.md` (borrador incremental de la sección 7). La guía visual está en `docs/verificacion_fase7.md`; no se afirma validación en navegador desde el entorno restringido.

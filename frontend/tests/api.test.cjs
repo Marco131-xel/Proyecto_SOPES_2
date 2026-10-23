@@ -76,3 +76,23 @@ test('Desmontar ignora una respuesta de sondeo pendiente', async t => {
   assert.equal(recibidos, 0);
   assert.ok(StreamFalso.ultimo.cerrado);
 });
+
+test('Comparación envía la carga configurable y consulta el trabajo con cancelación', async t => {
+  const configuracion = { semilla: 42, cantidadPedidos: 300, tasaLlegadasPorMinuto: 4 };
+  const llamadas = [];
+  t.mock.method(globalThis, 'fetch', async (url, opciones) => {
+    llamadas.push({ url, opciones });
+    return new Response(JSON.stringify({ id: 1, estado: 'EJECUTANDO', configuracion }), { status: opciones.method === 'POST' ? 202 : 200 });
+  });
+  assert.equal((await api.ejecutarComparacion(configuracion)).estado, 'EJECUTANDO');
+  const abortador = new AbortController();
+  await api.obtenerComparacion(abortador.signal);
+  assert.equal(llamadas[0].url, '/api/comparacion');
+  assert.deepEqual(JSON.parse(llamadas[0].opciones.body), configuracion);
+  assert.equal(llamadas[1].opciones.signal, abortador.signal);
+});
+
+test('Comparación propaga el rechazo de un trabajo solapado', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ mensaje: 'Ya hay una comparación en ejecución' }), { status: 409 }));
+  await assert.rejects(api.ejecutarComparacion({ semilla: 1, cantidadPedidos: 30, tasaLlegadasPorMinuto: 4 }), /Ya hay una comparación/);
+});

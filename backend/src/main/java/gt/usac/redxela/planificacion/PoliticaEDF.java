@@ -14,12 +14,10 @@ import java.util.Comparator;
  *   Deadline = InstanteCreacion + EsperaObjetivoSegundos(Nivel)
  * 
  * Fundamento Teórico:
- * De acuerdo con el teorema de Liu y Layland (1973), EDF es un algoritmo óptimo de
- * planificación dinámica: si un conjunto de tareas con plazos definidos es planificable,
- * EDF encontrará un cronograma válido sin violar fechas límite.
- * 
- * Prioriza al pedido cuyo SLA esté más próximo a vencer (o ya vencido), maximizando
- * directamente la tasa porcentual de cumplimiento de SLA del centro logístico.
+ * EDF ordena por el vencimiento absoluto del SLA. Las garantías clásicas de
+ * optimalidad requieren supuestos como expropiación y recursos independientes.
+ * Este simulador retiene varios recursos y no expropia: no se promete maximizar
+ * el porcentaje de SLA cumplido; el comparador mide ese resultado experimental.
  */
 @Component
 public class PoliticaEDF implements PoliticaAtencion {

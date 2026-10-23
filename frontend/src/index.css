@@ -1563,3 +1563,11 @@ body {
 .eventos-lista { max-height: 260px; overflow: auto; }
 .evento-fila { display: flex; flex-wrap: wrap; gap: 1rem; padding: .5rem; border-bottom: 1px solid #334155; }
 .evento-fila time { color: #94a3b8; min-width: 70px; }
+
+/* Configuración y resultados del experimento de planificación. */
+.comparacion-form { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 1rem 0; }
+.comparacion-form label { display: grid; gap: .4rem; flex: 1 1 150px; }
+.comparacion-form input { width: 100%; }
+.comparacion-huella { overflow-wrap: anywhere; color: #94a3b8; }
+.comparacion-conclusion { padding: 1rem; background: #172554; border-left: 3px solid #38bdf8; margin-top: 1rem; }
+details > summary { cursor: pointer; padding: .8rem 0; color: #cbd5e1; }

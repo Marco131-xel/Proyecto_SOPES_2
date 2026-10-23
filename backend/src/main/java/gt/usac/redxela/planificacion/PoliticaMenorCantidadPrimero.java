@@ -14,8 +14,9 @@ import java.util.Comparator;
  * clásico SJF (o SPT - Shortest Processing Time).
  * 
  * Fundamento Teórico:
- * El algoritmo SJF es matemáticamente óptimo para minimizar el tiempo medio de espera
- * (Average Waiting Time) en sistemas de colas.
+ * Con todos los trabajos disponibles al inicio y un único procesador, SJF minimiza
+ * la espera media. Aquí hay llegadas y varios recursos: esa garantía no se traslada
+ * automáticamente al centro de distribución; se contrasta con el comparador.
  * 
  * Riesgo Teórico:
  * Pedidos muy grandes (alta cantidad de unidades) pueden sufrir inanición si entran

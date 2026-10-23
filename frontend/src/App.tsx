@@ -6,6 +6,7 @@ import {
   Producto,
   TipoMercanciaInfo
 } from './types/simulacion';
+import { PanelComparacion } from './components/PanelComparacion';
 import { PanelEventos } from './components/PanelEventos';
 import { BarraControl } from './components/BarraControl';
 import { PanelRecursos } from './components/PanelRecursos';
@@ -293,10 +294,7 @@ export const App: React.FC = () => {
         {tabActiva === 'metricas' && (
           <>
             <PanelEstadisticas estadisticas={estado?.estadisticas} recursos={estado?.recursos} />
-            <div className="card-panel">
-              <h2 className="panel-titulo">Comparador de políticas — Fase 7</h2>
-              <p>La ejecución de la misma carga con semilla fija en motores aislados se implementará en la siguiente fase.</p>
-            </div>
+            <PanelComparacion />
           </>
         )}
 

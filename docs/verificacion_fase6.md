@@ -1,6 +1,6 @@
 # Fase 6: estado y verificación
 
-La API REST, SSE y los paneles operativos de React están implementados. Falta revisar visualmente la aplicación conectada en un navegador local. El comparador muestra su estado pendiente: el motor aislado, sus endpoints, tabla y gráfica se implementan en la Fase 7.
+La API REST, SSE y los paneles operativos de React están implementados. Falta revisar visualmente la aplicación conectada en un navegador local. El comparador se implementó posteriormente en la Fase 7; consulta [su guía de verificación](verificacion_fase7.md).
 
 ## Verificación automatizada
 
@@ -48,4 +48,4 @@ Visitar `http://localhost:5173`. Los datos viven en memoria y se reinician con e
 - [ ] Enviar datos inválidos: comprobar que el mensaje de error aparece en pantalla.
 - [ ] Confirmar legibilidad a resolución de proyector y ausencia de errores en consola al recorrer todas las pestañas.
 
-Los cambios se dejaron sin commit por instrucción del estudiante. La Fase 7 debe iniciarse como una fase separada.
+Los cambios se dejaron sin commit por instrucción del estudiante. La Fase 7 se continuó como una fase separada.

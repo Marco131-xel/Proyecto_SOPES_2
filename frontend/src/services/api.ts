@@ -3,7 +3,9 @@ import {
   Cliente,
   Producto,
   TipoMercanciaInfo,
-  InformeConflicto
+  InformeConflicto,
+  ConfiguracionComparacion,
+  EstadoComparacion
 } from '../types/simulacion';
 
 const BASE_URL = '/api';
@@ -161,6 +163,19 @@ export const api = {
       body: JSON.stringify({ tasaPedidosPorMinuto, semilla }),
     });
     return leerRespuesta(res);
+  },
+
+  // Comparación aislada: POST devuelve 202; GET consulta hasta completar.
+  async ejecutarComparacion(configuracion: ConfiguracionComparacion): Promise<EstadoComparacion> {
+    return leerRespuesta(await fetch(`${BASE_URL}/comparacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(configuracion),
+    }));
+  },
+
+  async obtenerComparacion(signal?: AbortSignal): Promise<EstadoComparacion> {
+    return leerRespuesta(await fetch(`${BASE_URL}/comparacion`, { signal }));
   },
 
   // Políticas

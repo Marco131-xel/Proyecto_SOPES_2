@@ -221,3 +221,40 @@ export interface Evento {
   tipo: string;
   mensaje: string;
 }
+
+export interface ConfiguracionComparacion {
+  semilla: number;
+  cantidadPedidos: number;
+  tasaLlegadasPorMinuto: number;
+}
+
+export interface ResultadoPolitica {
+  politica: string;
+  descripcion: string;
+  pedidosCompletados: number;
+  horizonteSimuladoSegundos: number;
+  esperaPromedioSegundos: number;
+  esperaMaximaSegundos: number;
+  porcentajeSLA: number;
+  throughputPedidosPorMinuto: number;
+  ocupacionMediaPorcentaje: number;
+  pedidosConInanicion: number;
+  niveles: EstadisticaNivelSnapshot[];
+  ocupacionPorRecurso: Record<TipoRecurso, number>;
+}
+
+export interface ResultadoComparacion {
+  configuracion: ConfiguracionComparacion;
+  huellaCarga: string;
+  alcance: string;
+  politicas: ResultadoPolitica[];
+  conclusion: string;
+}
+
+export interface EstadoComparacion {
+  id: number;
+  estado: 'SIN_EJECUTAR' | 'EJECUTANDO' | 'COMPLETADA' | 'ERROR';
+  configuracion: ConfiguracionComparacion | null;
+  resultado: ResultadoComparacion | null;
+  error: string | null;
+}
