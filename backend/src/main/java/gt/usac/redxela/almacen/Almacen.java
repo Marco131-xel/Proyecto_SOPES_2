@@ -149,6 +149,15 @@ public class Almacen {
         }
     }
 
+    /** Una actualización parcial también debe excluir al snapshot del almacén. */
+    public void actualizarCantidad(Ubicacion ubicacion, Producto producto, int cantidad, String loteId) {
+        rwLock.writeLock().lock();
+        try {
+            if (!loteId.equals(ubicacion.getLoteIdActual())) throw new IllegalStateException("La ubicación cambió de lote");
+            ubicacion.asignar(producto, cantidad, loteId);
+        } finally { rwLock.writeLock().unlock(); }
+    }
+
     public int getUbicacionesLibres() {
         rwLock.readLock().lock();
         try {

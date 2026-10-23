@@ -152,7 +152,7 @@ public class SimulacionController {
     @PostMapping("/pedidos")
     public ResponseEntity<Map<String, Object>> crearPedidoManual(@RequestBody CrearPedidoRequest req) {
         Cliente cliente = gestorClientes.buscarPorId(req.clienteId())
-                .orElseThrow(() -> new NoSuchElementException("Cliente no encontrado: " + req.clienteId()));
+                .orElseThrow(() -> new gt.usac.redxela.excepciones.ClienteNoEncontradoException("Cliente no encontrado: " + req.clienteId()));
 
         NivelServicio nivel = req.nivelServicio() != null
                 ? validarNivel(req.nivelServicio())

@@ -12,4 +12,8 @@ public record RecepcionSnapshot(
         long camionesProcesadosTotal,
         boolean escanerOcupado,
         List<Camion> camionesEnPatioDetalle
-) {}
+) {
+    public RecepcionSnapshot {
+        camionesEnPatioDetalle = List.copyOf(camionesEnPatioDetalle);
+    }
+}

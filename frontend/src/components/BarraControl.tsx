@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   EstadoSistema
 } from '../types/simulacion';
@@ -23,7 +23,7 @@ interface Props {
   onCambioPolitica: (politica: string) => void;
   onTogglePrevencion: (activar: boolean) => void;
   onToggleGenerador: (iniciar: boolean) => void;
-  onConfigurarGenerador: (tasa: number) => void;
+  onConfigurarGenerador: (tasa: number, semilla?: number) => void;
   onProvocarDeadlock: () => void;
 }
 
@@ -40,6 +40,8 @@ export const BarraControl: React.FC<Props> = ({
   onProvocarDeadlock,
 }) => {
   const [tasaLocal, setTasaLocal] = useState<number>(4);
+  const [semillaLocal, setSemillaLocal] = useState('');
+  useEffect(() => { if (estado) setTasaLocal(estado.tasaGenerador); }, [estado?.tasaGenerador]);
   const [mostrarConfigGen, setMostrarConfigGen] = useState(false);
 
   const formatoTiempo = (segundosTotal: number) => {
@@ -65,6 +67,7 @@ export const BarraControl: React.FC<Props> = ({
   const pausado = estado?.relojPausado ?? false;
   const generadorActivo = estado?.generadorActivo && !estado?.generadorPausado;
   const prevencion = estado?.prevencionDeadlock ?? false;
+  const hayMantenimiento = Object.values(estado?.recursos ?? {}).some(pool => pool.unidades.some(u => u.enMantenimiento));
 
   return (
     <header className="barra-control">
@@ -160,6 +163,12 @@ export const BarraControl: React.FC<Props> = ({
           </button>
         </div>
 
+        {prevencion && hayMantenimiento && !estado?.conflicto.hayConflicto && (
+          <button className="btn-toggle btn-seguro" onClick={() => onTogglePrevencion(true)}>
+            Restaurar recursos
+          </button>
+        )}
+
         {/* Generador de Tráfico */}
         <div className="grupo-generador">
           <button
@@ -204,11 +213,15 @@ export const BarraControl: React.FC<Props> = ({
               value={tasaLocal}
               onChange={(e) => setTasaLocal(Number(e.target.value))}
             />
+            <label>Semilla (opcional)
+              <input type="number" step="1" value={semillaLocal} className="input-redxela" onChange={e => setSemillaLocal(e.target.value)} />
+            </label>
             <button
+              disabled={!!semillaLocal.trim() && !Number.isSafeInteger(Number(semillaLocal))}
               className="btn-primario-sm"
-              onClick={() => onConfigurarGenerador(tasaLocal)}
+              onClick={() => onConfigurarGenerador(tasaLocal, semillaLocal.trim() ? Number(semillaLocal) : undefined)}
             >
-              Aplicar Tasa
+              Aplicar configuración
             </button>
           </div>
         </div>

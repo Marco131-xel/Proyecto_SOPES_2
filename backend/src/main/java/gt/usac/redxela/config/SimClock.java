@@ -41,7 +41,8 @@ public class SimClock {
      * @param factorInicial Multiplicador de velocidad (ej. 60.0 = 1s real son 60s sim).
      */
     public SimClock(double factorInicial) {
-        long ahoraReal = System.currentTimeMillis();
+        if (!Double.isFinite(factorInicial)) throw new IllegalArgumentException("Factor no finito");
+        long ahoraReal = System.nanoTime() / 1_000_000L;
         this.factor = Math.clamp(factorInicial, ConfiguracionSimulacion.FACTOR_RELOJ_MINIMO, ConfiguracionSimulacion.FACTOR_RELOJ_MAXIMO);
         this.tiempoRealBaseMs = ahoraReal;
         this.tiempoSimuladoBaseMs = 0;
@@ -59,7 +60,7 @@ public class SimClock {
             if (pausado) {
                 return tiempoSimuladoBaseMs;
             }
-            long deltaReal = System.currentTimeMillis() - tiempoRealBaseMs;
+            long deltaReal = System.nanoTime() / 1_000_000L - tiempoRealBaseMs;
             return tiempoSimuladoBaseMs + (long) (deltaReal * factor);
         } finally {
             lock.unlock();
@@ -82,10 +83,11 @@ public class SimClock {
      * @param nuevoFactor Nuevo factor entre [1.0, 600.0].
      */
     public void setFactor(double nuevoFactor) {
+        if (!Double.isFinite(nuevoFactor)) throw new IllegalArgumentException("Factor no finito");
         lock.lock();
         try {
             long simActual = ahoraSimuladoMs();
-            long realActual = System.currentTimeMillis();
+            long realActual = System.nanoTime() / 1_000_000L;
 
             this.factor = Math.clamp(nuevoFactor, ConfiguracionSimulacion.FACTOR_RELOJ_MINIMO, ConfiguracionSimulacion.FACTOR_RELOJ_MAXIMO);
             this.tiempoSimuladoBaseMs = simActual;
@@ -117,7 +119,7 @@ public class SimClock {
         lock.lock();
         try {
             if (pausado) {
-                this.tiempoRealBaseMs = System.currentTimeMillis();
+                this.tiempoRealBaseMs = System.nanoTime() / 1_000_000L;
                 this.pausado = false;
             }
         } finally {

@@ -13,7 +13,9 @@ import java.util.concurrent.locks.ReentrantLock;
  * ¿Por qué Semaphore con fair=true?
  * En sistemas operativos, la justicia FIFO en los semáforos evita la inanición de hilos
  * que compiten por el mismo recurso, garantizando que el primer hilo en solicitar
- * un permiso sea el primero en recibirlo cuando esté disponible.
+ * un permiso mediante acquire reciba trato FIFO. Los intentos tryAcquire inmediatos
+ * pueden adelantarse a la cola: la justicia del semáforo no garantiza por sí sola
+ * equidad global entre pedidos con varios recursos.
  * 
  * La asignación de qué unidad física específica (ej. "Montacargas-2") se otorga
  * a qué proceso se protege con un ReentrantLock dedicado de exclusión mutua.
@@ -206,5 +208,7 @@ public class PoolRecurso {
             int capacidadTotal,
             int disponibles,
             List<UnidadRecurso.UnidadSnapshot> unidades
-    ) {}
+    ) {
+        public PoolSnapshot { unidades = List.copyOf(unidades); }
+    }
 }

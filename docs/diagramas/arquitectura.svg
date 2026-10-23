@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="255" viewBox="0 0 800 255" role="img" aria-label="Arquitectura de REDXela">
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="#2563eb"/></marker></defs>
+<rect width="800" height="255" fill="white"/>
+<text x="400" y="28" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#0f172a">Arquitectura de REDXela</text>
+<line x1="220" y1="85" x2="305" y2="85" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<line x1="495" y1="85" x2="580" y2="85" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<line x1="675" y1="115" x2="675" y2="165" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<line x1="580" y1="195" x2="495" y2="195" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<line x1="400" y1="115" x2="400" y2="165" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<line x1="125" y1="115" x2="125" y2="165" stroke="#2563eb" stroke-width="2" marker-end="url(#a)"/>
+<rect x="30" y="55" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="125" y="79" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">React / Vite</text>
+<text x="125" y="98" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Paneles y gráficos</text>
+<rect x="305" y="55" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="400" y="79" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">REST + SSE</text>
+<text x="400" y="98" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Controladores Spring</text>
+<rect x="580" y="55" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="675" y="79" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Coordinador</text>
+<text x="675" y="98" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Motor en memoria</text>
+<rect x="580" y="165" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="675" y="189" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Pedidos y recursos</text>
+<text x="675" y="208" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Hilos + semáforos</text>
+<rect x="305" y="165" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="400" y="189" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Recepción e Inventario</text>
+<text x="400" y="208" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Cola de mensajes</text>
+<rect x="30" y="165" width="190" height="60" rx="9" fill="#eff6ff" stroke="#2563eb"/>
+<text x="125" y="189" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Comparador aislado</text>
+<text x="125" y="208" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#0f172a">Reloj lógico propio</text>
+</svg>

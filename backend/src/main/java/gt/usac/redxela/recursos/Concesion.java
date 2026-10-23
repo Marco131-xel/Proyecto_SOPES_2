@@ -54,8 +54,8 @@ public class Concesion implements AutoCloseable {
                     try {
                         a.pool().release(a.unidad(), pedidoId);
                     } catch (Exception e) {
-                        System.err.printf("[ERROR] Fallo al liberar unidad %s para pedido %s: %s%n",
-                                a.unidad().getId(), pedidoId, e.getMessage());
+                        org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo al liberar unidad {} del pedido {}",
+                                a.unidad().getId(), pedidoId, e);
                     }
                 }
                 asignaciones.clear();

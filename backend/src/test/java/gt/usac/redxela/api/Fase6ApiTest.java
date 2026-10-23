@@ -167,6 +167,15 @@ class Fase6ApiTest {
     }
 
     @Test @Order(8)
+    void erroresDeProtocoloNoSeConviertenEn500() throws Exception {
+        mvc.perform(get("/api/no-existe")).andExpect(status().isNotFound());
+        mvc.perform(put("/api/clientes").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/api/clientes").contentType(MediaType.TEXT_PLAIN).content("cliente"))
+                .andExpect(status().isUnsupportedMediaType());
+    }
+
+    @Test @Order(9)
     void pausaDelRelojDetieneElTrabajoEnCurso() throws Exception {
         SimClock reloj = new SimClock(600);
         reloj.pausar();

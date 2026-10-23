@@ -37,9 +37,25 @@ public class ManejadorGlobalExcepciones {
         return construirRespuesta(HttpStatus.CONFLICT, "Estado del sistema en conflicto", ex.getMessage());
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> manejarRutaInexistente(Exception ex) {
+        return construirRespuesta(HttpStatus.NOT_FOUND, "Ruta no encontrada", "No existe la ruta solicitada");
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> manejarMetodo(Exception ex) {
+        return construirRespuesta(HttpStatus.METHOD_NOT_ALLOWED, "Método no permitido", ex.getMessage());
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> manejarTipoContenido(Exception ex) {
+        return construirRespuesta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Tipo de contenido no soportado", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> manejarGeneral(Exception ex) {
-        return construirRespuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", ex.getMessage());
+        org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo no controlado en la API", ex);
+        return construirRespuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", "Consulte el registro del backend");
     }
 
     private ResponseEntity<Map<String, Object>> construirRespuesta(HttpStatus status, String error, String mensaje) {

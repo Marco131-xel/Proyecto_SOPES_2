@@ -122,9 +122,9 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleConfigurarGenerador = async (tasa: number) => {
+  const handleConfigurarGenerador = async (tasa: number, semilla?: number) => {
     try {
-      await api.configurarGenerador(tasa);
+      await api.configurarGenerador(tasa, semilla);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo ejecutar la operación');
     }

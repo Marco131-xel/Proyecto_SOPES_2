@@ -136,7 +136,7 @@ public class Recepcion implements Runnable {
 
                 try {
                     // Simular tiempo de escaneo del camión
-                    simClock.dormirSimuladoMs(200);
+                    simClock.dormirSimuladoMs(ConfiguracionSimulacion.TIEMPO_ESCANEO_SIM_MS);
                 } finally {
                     // Liberación inmediata del escáner para que otras áreas puedan usarlo
                     poolEscaner.release(escaner, camion.id());
@@ -158,7 +158,7 @@ public class Recepcion implements Runnable {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.printf("[ERROR] Fallo en hilo de recepción: %s%n", e.getMessage());
+                org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo en hilo de recepción", e);
             }
         }
     }

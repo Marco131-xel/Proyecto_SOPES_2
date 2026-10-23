@@ -37,6 +37,13 @@ public record EstadoSistema(
         InformeConflicto conflicto,
         List<gt.usac.redxela.eventos.RegistroEventos.Evento> eventos
 ) {
+    public EstadoSistema {
+        recursos = Map.copyOf(recursos);
+        pedidosEnProceso = List.copyOf(pedidosEnProceso);
+        listaEspera = List.copyOf(listaEspera);
+        ultimosCompletados = List.copyOf(ultimosCompletados);
+        eventos = List.copyOf(eventos);
+    }
     public record PedidoDetalleDTO(
             String id,
             String clienteNombre,
@@ -52,5 +59,10 @@ public record EstadoSistema(
             String recursoSolicitado,
             int vecesReencolado,
             List<String> tiposMercancia
-    ) {}
+    ) {
+        public PedidoDetalleDTO {
+            recursosRetenidos = List.copyOf(recursosRetenidos);
+            tiposMercancia = List.copyOf(tiposMercancia);
+        }
+    }
 }

@@ -1,84 +1,84 @@
-# REDXela — Simulador Concurrente de Centro de Distribución
-### Proyecto Final Sistemas Operativos 2 — USAC (Octubre 2026)
+# REDXela — Simulador concurrente de centro de distribución
 
-REDXela es un simulador concurrente de un centro logístico y de distribución de alta demanda, modelado como procesos y recursos compartidos del sistema operativo para evidenciar conceptos de concurrencia, sincronización, exclusión mutua, planificación de CPU, prevención/detección de interbloqueos (deadlock) y administración de almacenamiento en memoria no contigua.
+Proyecto Final Sistemas Operativos 2 · USAC · Octubre 2026.
 
----
+Pedidos en hilos Java reales, semáforos y monitores, cuatro políticas, recepción por mensajes, almacén indexado, deadlock dirigido y comparación reproducible. Spring Boot expone REST/SSE y React muestra once paneles distribuidos en cuatro pestañas.
 
-## 1. Requisitos del Sistema
+## Requisitos
 
-- **Java Development Kit (JDK):** Versión 21 (OpenJDK 21 recomendado).
-- **Apache Maven:** Versión 3.9 o superior.
-- **Node.js y npm:** Node.js v18+ (probado con v22+) y npm v10+.
-- **Navegador Web:** Chrome, Firefox o Edge compatible con Server-Sent Events (SSE).
+Java 21, Maven 3.9+, Node.js 22, npm y navegador moderno. Se verificaron Java 21.0.13, Maven 3.9.16 y Node 22.23.2. No se necesita base de datos. El uso previsto es local; los datos se pierden al reiniciar el backend.
 
----
+## Ejecución
 
-## 2. Estructura del Proyecto
+Desde `Proyecto_SOPES_2`, abrir dos terminales.
 
-```
-proyecto_final/
-├── PLAN_AGENTE.md                 # Contrato del proyecto, requisitos y diseño
-├── README.md                      # Instrucciones de compilación y ejecución
-├── docs/
-│   ├── bitacora_decisiones.md     # Decisiones de diseño y fundamento teórico para la defensa
-│   ├── manual_usuario.md          # Manual de usuario con capturas y guía de uso
-│   ├── manual_tecnico.md          # Manual técnico de arquitectura y algoritmos
-│   └── diagramas/                 # Diagramas de arquitectura y flujo
-├── backend/                       # Servidor Spring Boot 3 + java.util.concurrent nativo
-│   ├── pom.xml
-│   └── src/
-└── frontend/                      # Cliente web reactivo con React 18 + TypeScript + Vite
-    ├── package.json
-    └── src/
+Backend:
+
+```bash
+cd backend
+mvn test
+mvn spring-boot:run
 ```
 
----
-
-## 3. Compilación y Ejecución
-
-### 3.1 Backend (Spring Boot)
-
-1. Ingresar a la carpeta del backend:
-   ```bash
-   cd backend
-   ```
-2. Ejecutar pruebas unitarias y de concurrencia:
-   ```bash
-   mvn test
-   ```
-3. Iniciar el servidor en modo desarrollo:
-   ```bash
-   mvn spring-boot:run
-   ```
-   El backend iniciará en `http://localhost:8080`.
-
-### 3.2 Frontend (React + Vite)
-
-1. Ingresar a la carpeta del frontend:
-   ```bash
-   cd frontend
-   ```
-2. Instalar dependencias (solo la primera vez):
-   ```bash
-   npm install
-   ```
-3. Iniciar el servidor de desarrollo Vite:
-   ```bash
-   npm run dev
-   ```
-   La aplicación web estará disponible en `http://localhost:5173`. Las peticiones `/api` se redirigen automáticamente al backend.
-
-## 4. Estado de las fases
-
-Las fases 0–6 están registradas en Git. La Fase 6 incorpora REST, SSE con respaldo por sondeo, controles en vivo, registro manual, recursos, cola, métricas Recharts, mapa del almacén, recepción, grafo de deadlock y registro de eventos.
-
-La revisión visual local sigue pendiente; el entorno del agente impide abrir puertos y ejecutar el navegador. La Fase 7 incorpora el comparador funcional de políticas: configuración de carga y semilla, ejecuciones aisladas, tabla y gráfica por nivel. Consulta [la verificación de Fase 7](docs/verificacion_fase7.md) y [los resultados en el borrador del Manual Técnico](docs/manual_tecnico.md). Consulta [la verificación de Fase 6](docs/verificacion_fase6.md) para el recorrido y las condiciones del escenario de deadlock.
-
-Para verificar el frontend (Node 22):
+Frontend:
 
 ```bash
 cd frontend
+npm ci
+npm run dev
+```
+
+Abrir `http://localhost:5173`. El backend usa 8080 y el proxy está en `frontend/vite.config.ts`. Esperar unos segundos a que termine la recepción de stock inicial. El generador inicia apagado y la prevención activada.
+
+## Pruebas y construcción
+
+En `backend`, `mvn package` ejecuta pruebas y genera `target/redxela-1.0.0.jar`; se inicia con `java -jar target/redxela-1.0.0.jar`.
+
+En este entorno, `mvn package` pasó compilación y las 45 pruebas, pero no pudo generar el JAR: falta una dependencia del plugin de empaquetado y `~/.m2` es de sólo lectura. Completar ese paso con las dependencias disponibles y una caché escribible forma parte del empaquetado pendiente de Fase 9.
+
+En `frontend`:
+
+```bash
 npm test
 npm run build
 ```
+
+El build estático queda en `frontend/dist`. Fuera del servidor de desarrollo, quien lo sirva debe dirigir `/api` al backend; el proxy de Vite sólo se configura para desarrollo.
+
+## Documentación
+
+- [Manual de Usuario](docs/manual_usuario.md) · [PDF](docs/manual_usuario.pdf): arranque, paneles, pedidos, recepción, deadlock y comparación.
+- [Manual Técnico](docs/manual_tecnico.md) · [PDF](docs/manual_tecnico.pdf): arquitectura, decisiones, algoritmos, resultados, pruebas y respuestas de defensa.
+- [Matriz de aceptación R1–R18](docs/aceptacion.md) y [bitácora de decisiones](docs/bitacora_decisiones.md).
+- [Verificación de interfaz](docs/verificacion_fase6.md), [comparador](docs/verificacion_fase7.md) y [capturas pendientes](docs/capturas/README.md).
+- [Diagramas vectoriales](docs/diagramas/README.md).
+
+Para regenerar PDF, instalar previamente Python 3 y groff con soporte PDF, tbl y pic. Desde la raíz del repositorio:
+
+```bash
+python scripts/generar_manuales.py
+```
+
+El script usa herramientas locales, sin navegador, dependencias pip ni red. Los PDF versionados ya están disponibles para lectura sin esas herramientas.
+
+## Estado por fases
+
+Fases 0–7 registradas por el estudiante. La Fase 8 añade revisión de calidad, regresiones y manuales Markdown/PDF. Se verificaron 45 pruebas Java y 7 del frontend, además del build.
+
+La revisión visual local, capturas reales, dos recorridos en proyector y empaquetado siguen pendientes de Fase 9: el entorno del agente impide abrir puertos y lanzar navegador. No se presenta esa revisión como realizada.
+
+El comparador conserva su aislamiento y resultados de referencia para 42/300/4. El escenario ahora utiliza una barrera; al resolver, activa prevención para reintentar sin recrear el ciclo, y **Restaurar recursos** retira mantenimiento. Los cambios se dejan sin `git add`, commit ni push, por instrucción del estudiante.
+
+## Estructura
+
+```text
+proyecto_final/
+├── PLAN_AGENTE.md
+└── Proyecto_SOPES_2/
+    ├── backend/             # Java, API y pruebas
+    ├── frontend/            # React, transporte y build
+    ├── docs/                # Manuales, PDF, diagramas y aceptación
+    └── scripts/             # Generación local de documentos
+```
+
+La cola pendiente puede crecer si entran pedidos indefinidamente sin stock. Pausar el generador y reabastecer evita acumular trabajo sin factibilidad. Los límites y supuestos se detallan en el Manual Técnico.

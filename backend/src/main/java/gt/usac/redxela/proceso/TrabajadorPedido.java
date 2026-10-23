@@ -57,6 +57,7 @@ public class TrabajadorPedido implements Runnable {
 
                     concesionEfectiva.agregar(gestorRecursos.getPool(tipo), unidad);
                     pedido.registrarUnidadRetenida(unidad.getNombreLegible());
+                    if (concesionEfectiva.getAsignaciones().size() == 1) pedido.esperarParDelEscenario();
                 }
             }
 
@@ -88,7 +89,7 @@ public class TrabajadorPedido implements Runnable {
             pedido.marcarEnEsperaRecursos();
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            System.err.printf("[ERROR] Fallo inesperado en hilo de pedido %s: %s%n", pedido.getId(), e.getMessage());
+            org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo inesperado en pedido {}", pedido.getId(), e);
             pedido.cancelar();
         } finally {
             // Garantía estricta de liberación incondicional de recursos retenidos

@@ -51,16 +51,25 @@ public class GestorEscenarioDeadlock {
      * Provoca deliberadamente el escenario de interbloqueo reproducible (R14).
      */
     public synchronized List<Pedido> provocarEscenarioDeadlock() {
-        // 1. Desactivar prevención de deadlock
-        gestorRecursos.setPrevencionDeadlock(false);
+        if (!despachador.getPedidosEnProceso().isEmpty() || listaEspera.size() > 0)
+            throw new IllegalStateException("El escenario requiere la cola y los trabajadores vacíos");
+        // El modo cambia sólo cuando se logró aislar las instancias sobrantes.
 
         // 2. Aislar unidades a 1 Montacargas y 1 Carga mediante Mantenimiento
         PoolRecurso poolMontacargas = gestorRecursos.getPool(TipoRecurso.MONTACARGAS);
         PoolRecurso poolCarga = gestorRecursos.getPool(TipoRecurso.CARGA);
 
-        poolMontacargas.ponerEnMantenimiento("MTC-02");
-        poolMontacargas.ponerEnMantenimiento("MTC-03");
-        poolCarga.ponerEnMantenimiento("CRG-02");
+        List<String> nuevos = new ArrayList<>();
+        for (String id : List.of("MTC-02", "MTC-03", "CRG-02")) {
+            PoolRecurso pool = id.startsWith("MTC") ? poolMontacargas : poolCarga;
+            boolean yaAislada = pool.getUnidades().stream().anyMatch(u -> u.getId().equals(id) && u.isEnMantenimiento());
+            if (!yaAislada && !pool.ponerEnMantenimiento(id)) {
+                for (String previo : nuevos) (previo.startsWith("MTC") ? poolMontacargas : poolCarga).quitarMantenimiento(previo);
+                throw new IllegalStateException("No se pudo aislar la unidad " + id);
+            }
+            if (!yaAislada) nuevos.add(id);
+        }
+        gestorRecursos.setPrevencionDeadlock(false);
 
         Cliente cliente = gestorClientes.obtenerTodos().get(0);
         Producto prodPesado = CatalogoProductos.obtenerPorId("PROD-PES-01");
@@ -88,6 +97,9 @@ public class GestorEscenarioDeadlock {
                 List.of(TipoRecurso.CARGA, TipoRecurso.MONTACARGAS, TipoRecurso.EMPAQUE)
         );
 
+        var barrera = new java.util.concurrent.CyclicBarrier(2);
+        pedidoA.setBarreraEscenario(barrera);
+        pedidoB.setBarreraEscenario(barrera);
         despachador.registrarPedido(pedidoA);
         despachador.registrarPedido(pedidoB);
 
@@ -102,13 +114,15 @@ public class GestorEscenarioDeadlock {
     public synchronized void resolverConflictoManual(String pedidoGanadorId) {
         InformeConflicto informe = detectorDeadlock.ejecutarDeteccion();
         if (!informe.hayConflicto()) {
-            throw new IllegalStateException("No existe ningún interbloqueo activo para resolver");
+            throw new gt.usac.redxela.excepciones.ConflictoNoExisteException("No existe ningún interbloqueo activo para resolver");
         }
 
         if (!informe.pedidosInvolucrados().contains(pedidoGanadorId)) {
             throw new IllegalArgumentException("El pedido ganador no forma parte de este conflicto: " + pedidoGanadorId);
         }
 
+        // Reintentos de víctimas serán todo-o-nada: no pueden reconstruir el ciclo.
+        gestorRecursos.setPrevencionDeadlock(true);
         // Para cada pedido en conflicto que NO sea el ganador (víctimas elegidas para retroceso)
         for (String pedidoId : informe.pedidosInvolucrados()) {
             if (!pedidoId.equals(pedidoGanadorId)) {

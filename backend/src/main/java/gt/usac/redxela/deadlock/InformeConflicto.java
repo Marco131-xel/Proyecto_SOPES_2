@@ -18,6 +18,13 @@ public record InformeConflicto(
         String explicacion,
         long instanteDeteccion
 ) {
+    public InformeConflicto {
+        pedidosInvolucrados = List.copyOf(pedidosInvolucrados);
+        recursosDisputados = List.copyOf(recursosDisputados);
+        grafoAsignacion = List.copyOf(grafoAsignacion);
+    }
+
+    /** Cero indica que no hay instante de detección de conflicto aplicable. */
     public static InformeConflicto sinConflicto() {
         return new InformeConflicto(
                 false,
@@ -25,7 +32,7 @@ public record InformeConflicto(
                 Collections.emptyList(),
                 Collections.emptyList(),
                 "No se detecta ningún interbloqueo en el sistema. Todos los procesos avanzan normalmente.",
-                System.currentTimeMillis() / 1000L
+                0L
         );
     }
 }

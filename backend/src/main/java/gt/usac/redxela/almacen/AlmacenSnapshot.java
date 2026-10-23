@@ -15,4 +15,9 @@ public record AlmacenSnapshot(
         int lotesPendientesEspacio,
         List<Ubicacion.UbicacionSnapshot> ubicaciones,
         List<Lote.LoteSnapshot> lotesActivos
-) {}
+) {
+    public AlmacenSnapshot {
+        ubicaciones = List.copyOf(ubicaciones);
+        lotesActivos = List.copyOf(lotesActivos);
+    }
+}

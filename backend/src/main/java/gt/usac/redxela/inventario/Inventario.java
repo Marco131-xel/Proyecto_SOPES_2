@@ -112,7 +112,7 @@ public class Inventario implements Runnable {
                 MensajeRecepcion mensaje = recepcion.getColaMensajes().take();
 
                 // Procesamiento a ritmo propio (simula tiempo de descarga y ubicación en almacén)
-                simClock.dormirSimuladoMs(150);
+                simClock.dormirSimuladoMs(gt.usac.redxela.config.ConfiguracionSimulacion.TIEMPO_INVENTARIO_SIM_MS);
 
                 procesarMensaje(mensaje);
 
@@ -120,7 +120,7 @@ public class Inventario implements Runnable {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.printf("[ERROR] Fallo en hilo de inventario: %s%n", e.getMessage());
+                org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo en hilo de inventario", e);
             }
         }
     }
@@ -230,7 +230,7 @@ public class Inventario implements Runnable {
                                     almacen.liberarUbicacion(entrada.ubicacion());
                                 } else {
                                     // Parcial en la celda
-                                    entrada.ubicacion().asignar(
+                                    almacen.actualizarCantidad(entrada.ubicacion(),
                                             lp.producto(), enCelda - cantidadAConsumir, lote.getId());
                                     cantidadAConsumir = 0;
                                     break;

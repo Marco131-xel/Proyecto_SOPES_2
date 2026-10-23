@@ -33,6 +33,19 @@ public class Pedido {
     private final List<TipoRecurso> ordenAdquisicion;
     private final List<String> unidadesRecursosRetenidas = new CopyOnWriteArrayList<>();
 
+    private volatile java.util.concurrent.CyclicBarrier barreraEscenario;
+
+    /** Sólo el escenario controlado instala la barrera antes de lanzar sus dos pedidos. */
+    public void setBarreraEscenario(java.util.concurrent.CyclicBarrier barrera) { this.barreraEscenario = barrera; }
+
+    /** Ambos hilos deben retener su primer recurso antes de solicitar el segundo. */
+    public void esperarParDelEscenario() throws InterruptedException, java.util.concurrent.BrokenBarrierException {
+        var barrera = barreraEscenario;
+        if (barrera != null) {
+            try { barrera.await(); } finally { barreraEscenario = null; }
+        }
+    }
+
     private volatile EstadoPedido estado;
     private volatile Long instanteInicio; // Segundos simulados
     private volatile Long instanteFin;    // Segundos simulados
@@ -63,7 +76,7 @@ public class Pedido {
         this.nivel = (nivel != null) ? nivel : cliente.nivelContratado();
 
         if (lineas == null || lineas.isEmpty()) {
-            throw new IllegalArgumentException("Un pedido debe contener al menos una línea de producto");
+            throw new gt.usac.redxela.excepciones.PedidoInvalidoException("Un pedido debe contener al menos una línea de producto");
         }
         this.lineas = List.copyOf(lineas);
 
@@ -72,7 +85,7 @@ public class Pedido {
 
         for (LineaPedido lp : this.lineas) {
             try { acumuladorUnidades = Math.addExact(acumuladorUnidades, lp.cantidad()); }
-            catch (ArithmeticException e) { throw new IllegalArgumentException("Demasiadas unidades en el pedido"); }
+            catch (ArithmeticException e) { throw new gt.usac.redxela.excepciones.PedidoInvalidoException("Demasiadas unidades en el pedido"); }
             recursosUnion.addAll(lp.producto().tipoMercancia().getRecursosRequeridos());
         }
 
@@ -87,7 +100,7 @@ public class Pedido {
         if (ordenAdquisicionPersonalizado != null && !ordenAdquisicionPersonalizado.isEmpty()) {
             if (ordenAdquisicionPersonalizado.size() != recursosUnion.size()
                     || !new HashSet<>(ordenAdquisicionPersonalizado).equals(recursosUnion)) {
-                throw new IllegalArgumentException("El orden debe incluir cada recurso requerido exactamente una vez: " + recursosUnion);
+                throw new gt.usac.redxela.excepciones.PedidoInvalidoException("El orden debe incluir cada recurso requerido exactamente una vez: " + recursosUnion);
             }
             this.ordenAdquisicion = List.copyOf(ordenAdquisicionPersonalizado);
         } else {

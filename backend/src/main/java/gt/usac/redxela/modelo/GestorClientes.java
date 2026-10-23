@@ -59,7 +59,7 @@ public class GestorClientes {
 
     public Cliente obtenerPorId(String id) {
         return buscarPorId(id)
-                .orElseThrow(() -> new NoSuchElementException("Cliente no encontrado con ID: " + id));
+                .orElseThrow(() -> new gt.usac.redxela.excepciones.ClienteNoEncontradoException("Cliente no encontrado con ID: " + id));
     }
 
     public List<Cliente> obtenerTodos() {

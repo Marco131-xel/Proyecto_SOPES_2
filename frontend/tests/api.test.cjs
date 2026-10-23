@@ -96,3 +96,13 @@ test('Comparación propaga el rechazo de un trabajo solapado', async t => {
   t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ mensaje: 'Ya hay una comparación en ejecución' }), { status: 409 }));
   await assert.rejects(api.ejecutarComparacion({ semilla: 1, cantidadPedidos: 30, tasaLlegadasPorMinuto: 4 }), /Ya hay una comparación/);
 });
+
+test('Un error HTML del proxy conserva su estado HTTP en pantalla', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('<html>sin backend</html>', { status: 502, statusText: 'Bad Gateway' }));
+  await assert.rejects(api.obtenerClientes(), /Error 502: Bad Gateway/);
+});
+
+test('Una respuesta exitosa que no contiene JSON válido se rechaza', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('no es JSON', { status: 200 }));
+  await assert.rejects(api.obtenerEstado(), /respuesta JSON inválida/);
+});

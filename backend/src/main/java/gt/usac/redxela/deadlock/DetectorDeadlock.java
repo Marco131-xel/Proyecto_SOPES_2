@@ -80,7 +80,7 @@ public class DetectorDeadlock implements Runnable {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.printf("[ERROR] Fallo en hilo detector de deadlock: %s%n", e.getMessage());
+                org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo en hilo detector de deadlock", e);
             }
         }
     }
@@ -208,11 +208,12 @@ public class DetectorDeadlock implements Runnable {
                     .append(" operaciones bloqueadas entre sí en espera circular. ");
 
             for (Pedido pb : pedidosBloqueados) {
+                var solicitado = pb.getRecursoSolicitadoActual();
                 explicacion.append(String.format(
                         "[%s retiene %s y espera %s] ",
                         pb.getId(),
                         pb.getUnidadesRecursosRetenidas(),
-                        pb.getRecursoSolicitadoActual() != null ? pb.getRecursoSolicitadoActual().getNombreLegible() : "ninguno"
+                        solicitado != null ? solicitado.getNombreLegible() : "ninguno"
                 ));
             }
             explicacion.append("Condiciones de Coffman presentes: Exclusión mutua, Retención y espera, No expropiación y Espera circular.");

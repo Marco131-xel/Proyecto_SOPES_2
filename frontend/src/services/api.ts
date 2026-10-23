@@ -12,8 +12,10 @@ const BASE_URL = '/api';
 
 /** Todos los comandos comprueban HTTP y muestran el mensaje de validación del servidor. */
 async function leerRespuesta<T = any>(res: Response): Promise<T> {
-  const datos = await res.json();
-  if (!res.ok) throw new Error(datos.mensaje || `Error ${res.status}: ${res.statusText}`);
+  let datos;
+  try { datos = await res.json(); }
+  catch { throw new Error(res.ok ? 'El servidor devolvió una respuesta JSON inválida' : `Error ${res.status}: ${res.statusText}`); }
+  if (!res.ok) throw new Error(datos?.mensaje || `Error ${res.status}: ${res.statusText}`);
   return datos as T;
 }
 
@@ -65,7 +67,11 @@ export const api = {
         timer = undefined;
         onEstado(data);
         onModo?.('sse');
-      } catch { onError?.(event); }
+      } catch {
+        sseActivo = false;
+        onModo?.('reconectando');
+        onError?.(event);
+      }
     });
     eventSource.onerror = (err) => {
       sseActivo = false;

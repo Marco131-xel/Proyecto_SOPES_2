@@ -51,6 +51,10 @@ public final class ConfiguracionSimulacion {
     /** Frecuencia de publicación de la telemetría en milisegundos reales. */
     public static final long INTERVALO_PUBLICACION_ESTADO_MS = 500;
 
+    /** Consumidor deliberadamente más lento para poder observar contrapresión. */
+    public static final long TIEMPO_INVENTARIO_SIM_MS = 1000;
+    public static final long TIEMPO_ESCANEO_SIM_MS = 200;
+
     // --- Parámetros de Deadlock ---
     /** Pausa en milisegundos reales entre adquisiciones sucesivas en modo SIN PREVENCIÓN. */
     public static final long PAUSA_ENTRE_ADQUISICIONES_MS = 1500;

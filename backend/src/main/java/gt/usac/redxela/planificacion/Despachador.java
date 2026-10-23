@@ -160,7 +160,7 @@ public class Despachador implements Runnable {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.printf("[ERROR] Excepción en ciclo del despachador: %s%n", e.getMessage());
+                org.slf4j.LoggerFactory.getLogger(getClass()).error("Excepción en ciclo del despachador", e);
             }
         }
     }
