@@ -82,3 +82,23 @@ proyecto_final/
 ```
 
 La cola pendiente puede crecer si entran pedidos indefinidamente sin stock. Pausar el generador y reabastecer evita acumular trabajo sin factibilidad. Los límites y supuestos se detallan en el Manual Técnico.
+
+## Preparación de Fase 9
+
+El [guion de demo y ensayo](docs/guion_demo.md) define los dos recorridos que aún deben realizarse en navegador. La [verificación de Fase 9](docs/verificacion_fase9.md) registra los límites del entorno y los comandos de cierre.
+
+Para preparar un ZIP de fuentes, documentos y build de frontend ya generados:
+
+```bash
+python scripts/preparar_entrega.py
+```
+
+Se crea `output/entrega/REDXela-fase9-fuentes-sin-jar.zip` cuando falta el JAR, con manifiesto SHA-256 y estado explícito de contenido. No es un binario completo ni una certificación visual. El script excluye Git, node_modules, cachés y credenciales, y verifica CRC y hashes del ZIP.
+
+Después de resolver `mvn package`, exigir que la entrega incluya el ejecutable:
+
+```bash
+python scripts/preparar_entrega.py --exigir-jar
+```
+
+Ese modo falla si no existe un JAR Spring Boot con clases, lanzador y dependencias. Los archivos generados quedan ignorados por Git; no se ejecuta ningún commit o push.

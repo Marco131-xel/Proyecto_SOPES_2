@@ -217,3 +217,25 @@ Los límites se mantienen visibles: datos en memoria, cola pendiente sin admisi�
 ### Límite del empaquetado comprobado en F8
 
 `mvn package` compiló y ejecutó otra vez las 45 pruebas sin fallos. El paso posterior de JAR no pudo resolver `org.apache.maven.shared:file-management:3.1.0` y no puede escribir su marcador de descarga en `~/.m2` (sólo lectura). No existe un JAR nuevo generado en esta sesión. No se instalaron herramientas globales, no se pidió elevación ni se cambió el pom para eludirlo. Completar la caché y empaquetar en el entorno del estudiante queda registrado para Fase 9.
+
+---
+
+### Fase 9 — Preparación de entrega y ensayo
+
+Se retomó el commit del estudiante `f68e3b5` (Fase 8). Se mantiene la prohibición de git add, commit y push por parte del agente. La preparación del paquete es verificable; la fase no se declara cerrada sin JAR y recorrido visual.
+
+### DEC-032: Paquete trazable con alcance explícito
+- **Problema:** no es correcto llamar entrega ejecutable a un ZIP de fuentes si falta el JAR, ni incluir archivos privados al comprimir todo el directorio.
+- **Alternativas:** comprimir indiscriminadamente el árbol, detener toda preparación o crear una selección permitida de fuentes/artefactos con estado verificable.
+- **Elección:** scripts/preparar_entrega.py selecciona código, configuración pública, lockfile, pruebas, documentación y build. Excluye Git, node_modules, cachés y credenciales. Reconoce un JAR Spring Boot por manifiesto, lanzador, BOOT-INF y dependencias; --exigir-jar rechaza su ausencia. Genera SHA-256 individual y del ZIP, comprueba CRC y usa metadatos fijos para repetir el mismo archivo con las mismas entradas.
+- **Fundamento:** trazabilidad e integridad de entregables; el hash detecta corrupción o diferencias, sin presentarse como firma de autoría. Los informes JUnit se resumen sin exportar sus propiedades de proceso. El empaquetador verifica artefactos, no reemplaza pruebas ni certifica pantallas.
+
+### Límites de ejecución y guion
+
+Se volvió a intentar Vite: listen EPERM en 127.0.0.1:5173. Se aplicó la habilidad local Playwright; npx offline no tiene el metadato npm necesario y la CLI ya presente en caché tampoco pudo crear el daemon por EROFS en ~/.cache/ms-playwright. No hubo navegador ni capturas. Maven offline puede compilar, pero maven-jar-plugin conserva dependencias ausentes. No se cambiaron las versiones del pom, no se instaló globalmente ni se usó un JAR simple para aparentar un ejecutable.
+
+El guion docs/guion_demo.md reserva dos registros de ensayo pendientes, alterna ganador en deadlock y especifica comprobación de comparación, reconexión y proyector. docs/verificacion_fase9.md explica la preparación en una máquina con caché escribible y dependencias disponibles. El paquete local de fuentes no implica cierre visual ni entrega binaria completa.
+
+### Evidencia del paquete preparado
+
+Se reconfirmaron 45 pruebas Java con Maven offline y 7 de frontend, además del build de Vite. El paquete de 137 entradas se extrajo en una carpeta temporal y su manifiesto completo se verificó con sha256sum. Dos preparaciones con las mismas entradas generaron bytes idénticos. --exigir-jar rechazó la ausencia de ejecutable como corresponde. El hash actual y estado de contenido se generan junto al ZIP en output/entrega; no se confunde esta validación de integridad con cierre visual de Fase 9.

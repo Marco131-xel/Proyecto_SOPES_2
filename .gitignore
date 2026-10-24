@@ -19,3 +19,12 @@ frontend/.vite/
 
 # Logs
 *.log
+
+# Entregas y evidencia generada localmente
+/output/
+/.playwright/
+/.playwright-cli/
+
+# Caché de herramientas Python
+__pycache__/
+*.pyc

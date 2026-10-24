@@ -36,3 +36,9 @@ Fecha: 22/10/2026. Estado de implementación y evidencia automatizada; no sustit
 ## Cierre pendiente de Fase 9
 
 Usar docs/verificacion_fase6.md, docs/verificacion_fase7.md y docs/capturas/README.md. Ejecutar dos veces el guion de demostración completo en navegador, revisar legibilidad de proyector, incorporar las capturas en el manual, regenerar PDF y empaquetar la entrega. La repetición automatizada de deadlock no se presenta como dos demos visuales realizadas.
+
+## Preparación de Fase 9
+
+Se creó un empaquetador verificable para fuentes, manuales y frontend, con JAR opcional validado y modo estricto `--exigir-jar`. El paquete generado en este entorno se identifica como **fuentes sin JAR**, y no cambia el estado pendiente de R16/R18 en lo relativo a capturas y revisión visual.
+
+Se confirmó que Vite continúa sin permiso para abrir 127.0.0.1:5173. Playwright CLI no puede crear su daemon en la caché de sólo lectura. Maven offline detalla las dependencias del plugin de JAR que aún faltan. Ver `docs/verificacion_fase9.md`; no se registran demos que no se ejecutaron.
