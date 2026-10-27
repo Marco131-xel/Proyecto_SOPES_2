@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -16,6 +18,11 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class ManejadorGlobalExcepciones {
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void manejarRespuestaAsincronaCerrada(AsyncRequestNotUsableException ex) {
+        // La respuesta ya no admite escrituras: no intentar serializar un error JSON.
+    }
 
     @ExceptionHandler(java.util.NoSuchElementException.class)
     public ResponseEntity<Map<String, Object>> manejarNoEncontrado(Exception ex) {
@@ -54,6 +61,10 @@ public class ManejadorGlobalExcepciones {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> manejarGeneral(Exception ex) {
+        if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
+            // Incluye desconexiones notificadas como IOException/ClientAbortException.
+            return null;
+        }
         org.slf4j.LoggerFactory.getLogger(getClass()).error("Fallo no controlado en la API", ex);
         return construirRespuesta(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", "Consulte el registro del backend");
     }

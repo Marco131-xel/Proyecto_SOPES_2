@@ -56,26 +56,32 @@ public class SimulacionController {
         if (emisoresSSE.isEmpty()) return;
 
         EstadoSistema estado = coordinador.capturarEstado();
-        List<SseEmitter> muertos = new ArrayList<>();
-
         for (SseEmitter emisor : emisoresSSE) {
             try {
                 emisor.send(SseEmitter.event()
                         .name("estado")
                         .data(estado, MediaType.APPLICATION_JSON));
-            } catch (Exception e) {
-                emisor.complete();
-                muertos.add(emisor);
+            } catch (IOException | IllegalStateException e) {
+                // El contenedor gestiona el cierre tras un fallo de escritura.
+                // Completar aquí vuelve a usar un AsyncContext que puede estar cerrado.
+                emisoresSSE.remove(emisor);
+                log.debug("Conexión SSE retirada tras finalizar o fallar el envío: {}", e.toString());
             }
         }
-        emisoresSSE.removeAll(muertos);
     }
 
     /** Cierra el publicador y las conexiones al apagar el servidor. */
     @jakarta.annotation.PreDestroy
     public void cerrar() {
         schedulerSSE.shutdownNow();
-        for (SseEmitter emisor : emisoresSSE) emisor.complete();
+        for (SseEmitter emisor : emisoresSSE) {
+            try {
+                emisor.complete();
+            } catch (RuntimeException e) {
+                // Una conexión ya cerrada no debe impedir cerrar las demás.
+                log.debug("Conexión SSE ya no disponible durante el apagado: {}", e.toString());
+            }
+        }
         emisoresSSE.clear();
     }
 
@@ -89,20 +95,19 @@ public class SimulacionController {
     @GetMapping(value = "/estado/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter conectarStreamSSE() {
         SseEmitter emisor = new SseEmitter(0L); // Sin timeout automático
-        emisoresSSE.add(emisor);
-
         emisor.onCompletion(() -> emisoresSSE.remove(emisor));
         emisor.onTimeout(() -> emisoresSSE.remove(emisor));
         emisor.onError(e -> emisoresSSE.remove(emisor));
+        emisoresSSE.add(emisor);
 
         // Enviar estado inmediato al conectarse
         try {
             emisor.send(SseEmitter.event()
                     .name("estado")
                     .data(coordinador.capturarEstado(), MediaType.APPLICATION_JSON));
-        } catch (IOException e) {
-            emisor.complete();
+        } catch (IOException | IllegalStateException e) {
             emisoresSSE.remove(emisor);
+            log.debug("Conexión SSE no disponible al enviar el estado inicial: {}", e.toString());
         }
 
         return emisor;
